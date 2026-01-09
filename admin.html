@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>女子軟式野球部 管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Rounded+Mplus+1c&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: #fefaf5;
+      color: #5a3e2b;
+      font-family: 'Rounded Mplus 1c', 'Arial', sans-serif;
+      margin: 0;
+      padding: .5em;
+    }
+
+    header {
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.4em;
+      margin: .5em 0 .2em;
+    }
+
+    .tab-container {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #fefaf5;
+      padding: .25em .5em;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .tab {
+      display: inline-block;
+      padding: .6em 1.3em;
+      background: #d8bfa0;
+      border-radius: 12px 12px 0 0;
+      margin-right: 6px;
+      font-size: 1.05em;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: #a67c52;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .tools {
+      background: #fff;
+      border: 1px solid #a67c52;
+      border-radius: 12px;
+      margin: .6em;
+      padding: .6em;
+    }
+
+    .weekday {
+      display: flex;
+      gap: .3em;
+      flex-wrap: wrap;
+      margin: .3em 0;
+    }
+
+    .weekday label {
+      background: #e7d6c3;
+      padding: .35em .6em;
+      border-radius: 999px;
+      user-select: none;
+    }
+
+    .controls {
+      display: flex;
+      gap: .4em;
+      flex-wrap: wrap;
+      margin: .4em 0;
+    }
+
+    .btn {
+      border: 1.5px solid #a67c52;
+      background: #d8bfa0;
+      color: #5a3e2b;
+      border-radius: 10px;
+      padding: .5em .9em;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: #a67c52;
+      color: #fff;
+    }
+
+    .calendar-list {
+      display: flex;
+      flex-direction: column;
+      gap: .9em;
+      padding: 0 .6em 5.5em;
+    }
+
+    /* 表示高速化：画面外の描画を遅延（推定サイズを与える） */
+    .calendar-day {
+      background: #fff;
+      border: 1px solid #a67c52;
+      border-radius: 12px;
+      padding: .7em;
+      content-visibility: auto;
+      contain-intrinsic-size: 240px;
+    }
+
+    .calendar-day.undecided {
+      border: 2px dashed #ccc;
+    }
+
+    .calendar-day.off-day {
+      background: #eee;
+      opacity: 0.8;
+    }
+
+    .calendar-day.low-attendance {
+      border: 2px solid #e74c3c;
+      background: #fff5f5;
+    }
+
+    .calendar-day.low-attendance::after {
+      content: "人数不足のため中止の可能性";
+      display: block;
+      color: #e74c3c;
+      font-weight: bold;
+      margin-top: 0.5em;
+      text-align: center;
+    }
+
+    .calendar-day.sunday {
+      background: #f9d0d0;
+    }
+
+    .calendar-day.saturday {
+      background: #d0e7f9;
+    }
+
+    .day-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .6em;
+      margin-bottom: .4em;
+    }
+
+    .day-title {
+      font-weight: 700;
+      font-size: 1.05em;
+    }
+
+    .holiday-tag {
+      font-size: .85em;
+      color: #b33;
+      margin-left: .4em;
+    }
+
+    .switches {
+      display: flex;
+      gap: .4em;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      border: 1.5px solid #a67c52;
+      padding: .4em .8em;
+      border-radius: 999px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .chip.on {
+      background: #a67c52;
+      color: #fff;
+    }
+
+    .row {
+      display: flex;
+      gap: .5em;
+      align-items: center;
+      margin-top: .45em;
+    }
+
+    .row input[type="text"],
+    .row select {
+      flex: 1;
+      font-size: 1em;
+      padding: .55em .7em;
+      border-radius: 10px;
+      border: 1px solid #a67c52;
+      background: #fff;
+    }
+
+    .row .label {
+      min-width: 4em;
+      font-size: .95em;
+      color: #7a5a43;
+    }
+
+    .counts {
+      margin-top: .5em;
+      display: flex;
+      gap: .4em;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      background: #a67c52;
+      color: #fff;
+      border-radius: 8px;
+      padding: .25em .55em;
+      font-size: .9em;
+      cursor: pointer;
+    }
+
+    .badge.sub {
+      background: #7b5b3f;
+    }
+
+    #saveAllBtn {
+      position: fixed;
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(92%, 520px);
+      border: 1.5px solid #a67c52;
+      background: #a67c52;
+      color: #fff;
+      border-radius: 14px;
+      padding: .9em 1.1em;
+      font-size: 1.1em;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, .2);
+      z-index: 20;
+      display: none;
+    }
+
+    #saveAllBtn.dirty {
+      display: block;
+    }
+
+    #status {
+      text-align: center;
+      margin-top: .6em;
+      font-weight: 700;
+    }
+
+    /* ===== ダッシュボード（出席率＋遅/早） ===== */
+    .dash {
+      padding: .4em .6em;
+    }
+
+    .dash-card {
+      background: #fff;
+      border: 1px solid #a67c52;
+      border-radius: 12px;
+      padding: .8em;
+      margin: .6em .6em 1em;
+    }
+
+    .dash h3 {
+      margin: .1em 0 .6em;
+      font-size: 1.1em;
+      color: #5a3e2b;
+    }
+
+    .dash .meta-line {
+      color: #7a5a43;
+      font-size: .95em;
+      margin-bottom: .5em;
+    }
+
+    .dash table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .dash th,
+    .dash td {
+      padding: .45em .35em;
+      border-bottom: 1px solid #e7d6c3;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .dash th {
+      font-weight: 700;
+      color: #5a3e2b;
+    }
+
+    .dash .n {
+      width: 1%;
+    }
+
+    .dash .rate {
+      width: 1%;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .dash .cnts {
+      color: #7a5a43;
+      font-size: .95em;
+    }
+
+    .dash .bar {
+      height: 10px;
+      background: #e7d6c3;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .dash .bar>span {
+      display: block;
+      height: 100%;
+      background: #a67c52;
+    }
+
+    .dash .mini {
+      color: #7a5a43;
+      font-size: .9em;
+    }
+
+    /* ===== ローディング ===== */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(254, 250, 245, .9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .spinner {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 6px solid #d8bfa0;
+      border-top-color: #a67c52;
+      animation: spin 1s linear infinite;
+    }
+
+    .loading-text {
+      margin-top: 12px;
+      color: #5a3e2b;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Scroll to Top Button */
+    .scroll-top-btn {
+      position: fixed;
+      right: 20px;
+      bottom: 90px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #a67c52;
+      color: #fff;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, .3);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 90;
+      transition: opacity .3s;
+    }
+
+    .scroll-top-btn.show {
+      display: flex;
+    }
+
+    /* Today Highlight - Adjusted */
+    .calendar-day.today {
+      border: 3px solid #d35400;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(211, 84, 0, 0.3);
+    }
+
+    .calendar-day.today::before {
+      content: "TODAY";
+      position: absolute;
+      top: 0;
+      /* Changed from -14px */
+      left: 0;
+      /* Changed from -2px */
+      background: #d35400;
+      color: #fff;
+      font-size: 0.8rem;
+      padding: 3px 10px;
+      border-radius: 10px 0 10px 0;
+      font-weight: 800;
+      z-index: 2;
+    }
+  </style>
+</head>
+
+<body>
+  <header>女子軟式野球部 管理</header>
+  <div id="tabs" class="tab-container"></div>
+
+  <div class="tools">
+    <h3 style="margin:.1em 0 .4em;font-size:1.05em;">クイック設定（この月に一括適用）</h3>
+    <div class="weekday" id="weekdayGroup">
+      <label><input type="checkbox" value="0">日</label>
+      <label><input type="checkbox" value="1">月</label>
+      <label><input type="checkbox" value="2">火</label>
+      <label><input type="checkbox" value="3">水</label>
+      <label><input type="checkbox" value="4">木</label>
+      <label><input type="checkbox" value="5">金</label>
+      <label><input type="checkbox" value="6">土</label>
+    </div>
+    <div class="controls">
+      <button class="btn" id="qMorningOn">選んだ曜日：午前ON</button>
+      <button class="btn" id="qAfternoonOn">選んだ曜日：午後ON</button>
+      <button class="btn" id="qAfterOn">選んだ曜日：業後ON</button>
+      <button class="btn" id="qAllOff">選んだ曜日：すべてOFF</button>
+      <button class="btn" id="qClearCheck">曜日選択クリア</button>
+      <button class="btn" id="qUndecidedOff" style="margin-left:auto;background:#e2c6b0;font-weight:bold;">未定を全てオフ</button>
+    </div>
+  </div>
+
+  <div id="dashboard" class="dash"></div>
+
+  <div id="adminChartArea" style="display:none; margin:0 .6em 1em; padding:1em; background:#fff; border:1px solid #a67c52; border-radius:12px;">
+    <h3 style="margin:0 0 1em; font-size:1.1em;">出席率グラフ: <span id="chartTargetName"></span></h3>
+    <canvas id="adminChart" style="max-height:200px;"></canvas>
+    <button onclick="document.getElementById('adminChartArea').style.display='none'" class="btn" style="margin-top:1em;">閉じる</button>
+  </div>
+
+  <div id="calendar" class="calendar-list"></div>
+  <button id="saveAllBtn">登録</button>
+  <div id="status"></div>
+  <button id="scrollTopBtn" class="scroll-top-btn" aria-label="ページトップへ">▲</button>
+
+  <div id="loadingOverlay" class="overlay" aria-live="polite" aria-busy="true">
+    <div style="display:flex; flex-direction:column; align-items:center;">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="loading-text">読み込み中…</div>
+    </div>
+  </div>
+
+  <script>
+    /* === 表示対象期間 === */
+    const _now = new Date();
+    const startYear = _now.getFullYear();
+    const startMonth = _now.getMonth() + 1;
+    const monthsCount = 4;
+
+    /* === 状態 === */
+    let currentYear = startYear,
+      currentMonth = startMonth;
+    let schedule = {},
+      attendance = {},
+      holidays = {},
+      roster = [];
+    let unsavedPatch = {};
+    let adminChart = null;
+
+    /* === 時間リスト（06:00〜21:00、30分刻み）=== */
+    const HH = halfHourList(6, 21);
+
+    /* === 管理者ページ用キャッシュ === */
+    const ADMIN_CACHE_VER = "v2"; // ← 遅刻/早退対応
+    const adminCacheKey = (y, m) => `club_admin_cache_${ADMIN_CACHE_VER}_${y}-${('0'+m).slice(-2)}`;
+
+    function readAdminCache(y, m) {
+      try {
+        const s = localStorage.getItem(adminCacheKey(y, m));
+        return s ? JSON.parse(s) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function writeAdminCache(y, m, data) {
+      try {
+        localStorage.setItem(adminCacheKey(y, m), JSON.stringify({
+          ts: Date.now(),
+          data
+        }));
+      } catch (e) {}
+    }
+
+    /* === 初期化 === */
+    (function init() {
+      buildTabs();
+      document.getElementById("qMorningOn").onclick = () => applyQuick("M_ON");
+      document.getElementById("qAfternoonOn").onclick = () => applyQuick("A_ON");
+      document.getElementById("qAfterOn").onclick = () => applyQuick("F_ON");
+      document.getElementById("qAllOff").onclick = () => applyQuick("ALL_OFF");
+      document.getElementById("qUndecidedOff").onclick = () => applyQuick("UNDECIDED_OFF"); // 追加
+      document.getElementById("qClearCheck").onclick = () => document.querySelectorAll('#weekdayGroup input:checked').forEach(el => el.checked = false);
+      document.getElementById("saveAllBtn").onclick = () => flushPatch();
+      loadMonth();
+    })();
+    /* === ローディング === */
+    function setLoading(on) {
+      const ov = document.getElementById('loadingOverlay');
+      if (!ov) return;
+      ov.classList.toggle('show', !!on);
+    }
+
+    /* === タブ === */
+    function visibleMonths() {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const vis = [];
+      for (let i = 0; i < monthsCount; i++) {
+        let m = startMonth + i,
+          y = startYear;
+        if (m > 12) {
+          m -= 12;
+          y += 1;
+        }
+        const last = new Date(y, m, 0);
+        last.setHours(0, 0, 0, 0);
+        if (last >= today) vis.push({
+          y,
+          m
+        });
+      }
+      return vis;
+    }
+
+    function buildTabs() {
+      const tabs = document.getElementById("tabs");
+      const vis = visibleMonths();
+      tabs.innerHTML = "";
+      if (!vis.length) {
+        tabs.innerHTML = '<div style="padding:1em;color:#8a6b55;text-align:center;">対象月がありません。</div>';
+        return;
+      }
+      currentYear = vis[0].y;
+      currentMonth = vis[0].m;
+      vis.forEach((o, idx) => {
+        const el = document.createElement("div");
+        el.className = "tab" + (idx === 0 ? " active" : "");
+        el.textContent = `${o.y}年${o.m}月`;
+        el.dataset.year = o.y;
+        el.dataset.month = o.m;
+        el.onclick = () => switchTab(el);
+        el.onkeypress = (e) => {
+          if (e.key === "Enter" || e.key === " ") switchTab(el);
+        };
+        tabs.appendChild(el);
+      });
+    }
+
+    function switchTab(el) {
+      const go = () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        el.classList.add("active");
+        currentYear = parseInt(el.dataset.year, 10);
+        currentMonth = parseInt(el.dataset.month, 10);
+        loadMonth();
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth"
+        });
+      };
+      if (Object.keys(unsavedPatch).length > 0) {
+        flushPatch(null, go);
+      } else {
+        go();
+      }
+    }
+
+    /* === 保存キュー === */
+    function markDirty() {
+      document.getElementById("saveAllBtn").classList.toggle("dirty", Object.keys(unsavedPatch).length > 0);
+    }
+
+    function queuePatch(day, fields) {
+      unsavedPatch[day] = Object.assign({}, unsavedPatch[day] || {}, fields);
+      markDirty();
+    }
+
+    function setStatus(msg) {
+      const el = document.getElementById("status");
+      el.textContent = msg || "";
+      if (!msg) return;
+      setTimeout(() => {
+        if (el.textContent === msg) el.textContent = "";
+      }, 2000);
+    }
+
+    /* === 月データ読み込み（キャッシュ→最新差替え＋次月先読み） === */
+    function loadMonth() {
+      setLoading(true);
+      const cached = readAdminCache(currentYear, currentMonth);
+      if (cached && cached.data) {
+        schedule = cached.data.schedule || {};
+        attendance = cached.data.attendance || {};
+        holidays = cached.data.holidays || {};
+        roster = cached.data.roster || [];
+        unsavedPatch = {};
+        markDirty();
+        render();
+        autoScrollToToday();
+      }
+      google.script.run.withSuccessHandler(res => {
+        schedule = res.schedule || {};
+        attendance = res.attendance || {};
+        holidays = res.holidays || {};
+        roster = res.roster || [];
+        unsavedPatch = {};
+        markDirty();
+        render();
+        autoScrollToToday();
+        writeAdminCache(currentYear, currentMonth, {
+          schedule,
+          attendance,
+          holidays,
+          roster
+        });
+        prefetchNextMonth();
+        setLoading(false);
+      }).withFailureHandler(err => {
+        if (!cached) {
+          alert("データの読み込みに失敗しました。再読み込みしてください。");
+        }
+        setLoading(false);
+      }).getAdminData(currentYear, currentMonth);
+    }
+
+    function prefetchNextMonth() {
+      let y = currentYear,
+        m = currentMonth + 1;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
+      const endMonth = startMonth + monthsCount - 1;
+      const maxY = startYear + Math.floor((endMonth - 1) / 12);
+      const maxM = ((endMonth - 1) % 12) + 1;
+      const cmp = (y1, m1, y2, m2) => (y1 === y2 ? m1 - m2 : y1 - y2);
+      if (cmp(y, m, maxY, maxM) > 0) return;
+      if (readAdminCache(y, m)) return;
+      google.script.run.withSuccessHandler(res => {
+        writeAdminCache(y, m, {
+          schedule: res.schedule || {},
+          attendance: res.attendance || {},
+          holidays: res.holidays || {},
+          roster: res.roster || []
+        });
+      }).getAdminData(y, m);
+    }
+
+    /* === デフォルト時間（業後ON時） === */
+    function defaultAfterTimeRangeForDay(day) {
+      const w = new Date(currentYear, currentMonth - 1, day).getDay();
+      // 0:日 1:月 ... 6:土
+      if (w === 1 || w === 2 || w === 5) return "16:00~18:00";
+      // 月・火・金
+      if (w === 3 || w === 4) return "15:00~17:00";
+      // 水・木
+      return "";
+    }
+
+    /* === UI構築 === */
+    function render() {
+      renderDashboard();
+      const cont = document.getElementById("calendar");
+      cont.innerHTML = "";
+      const last = new Date(currentYear, currentMonth, 0).getDate();
+      const frag = document.createDocumentFragment();
+      for (let day = 1; day <= last; day++) {
+        const date = new Date(currentYear, currentMonth - 1, day);
+        const w = date.getDay();
+        const box = document.createElement("div");
+        box.className = "calendar-day";
+        if (w === 0 || holidays[day]) box.classList.add("sunday");
+        else if (w === 6) box.classList.add("saturday");
+
+        const weekday = ["日", "月", "火", "水", "木", "金", "土"][w];
+        const head = document.createElement("div");
+        head.className = "day-head";
+        const title = document.createElement("div");
+        title.className = "day-title";
+        title.textContent = `${day}日（${weekday}）`;
+        if (holidays[day]) {
+          const tag = document.createElement("span");
+          tag.className = "holiday-tag";
+          tag.textContent = holidays[day];
+          title.appendChild(tag);
+        }
+        head.appendChild(title);
+        const sw = document.createElement("div");
+        sw.className = "switches";
+        const mk = (key, label, dayNo) => {
+          const c = document.createElement("div");
+          c.className = "chip";
+          c.textContent = label;
+          c.onclick = () => {
+            schedule[dayNo] = schedule[dayNo] || {
+              off: false,
+              morning: false,
+              afternoon: false,
+              after: false,
+              note: "",
+              place: "",
+              time: ""
+            };
+            const cur = !!schedule[dayNo][key];
+            const next = !cur;
+
+            const p = {
+              [key]: next
+            };
+            if (key === "off" && next) { // オフをONにしたら他はOFFにする
+              p.morning = false;
+              p.afternoon = false;
+              p.after = false;
+              schedule[dayNo].morning = false;
+              schedule[dayNo].afternoon = false;
+              schedule[dayNo].after = false;
+            } else if (key !== "off" && next) { // 活動をONにしたらオフはOFFにする
+              p.off = false;
+              schedule[dayNo].off = false;
+            }
+
+            queuePatch(String(dayNo), p);
+            schedule[dayNo][key] = next;
+            // 業後ON→デフォルト時間（空欄時のみ）
+            if (key === "after" && next) {
+              const t = (schedule[dayNo].time || "").trim();
+              if (!t) {
+                const def = defaultAfterTimeRangeForDay(dayNo);
+                if (def) {
+                  schedule[dayNo].time = def;
+                  queuePatch(String(dayNo), {
+                    time: def
+                  });
+                }
+              }
+            }
+            render();
+          };
+          return c;
+        };
+        const cm = mk("morning", "午前", day),
+          ca = mk("afternoon", "午後", day),
+          cf = mk("after", "業後", day),
+          coff = mk("off", "オフ", day);
+        if (schedule[day]?.morning) cm.classList.add("on");
+        if (schedule[day]?.afternoon) ca.classList.add("on");
+        if (schedule[day]?.after) cf.classList.add("on");
+        if (schedule[day]?.off) coff.classList.add("on");
+
+        sw.appendChild(cm);
+        sw.appendChild(ca);
+        sw.appendChild(cf);
+        sw.appendChild(coff);
+        head.appendChild(sw);
+        box.appendChild(head);
+
+        const hasActivity = schedule[day]?.morning || schedule[day]?.afternoon || schedule[day]?.after;
+        if (schedule[day]?.off) {
+          box.classList.add("off-day");
+        } else if (!hasActivity) {
+          box.classList.add("undecided");
+          title.textContent += "（未定）";
+        }
+
+        box.appendChild(makeInputRow("イベント", schedule[day]?.note || "", v => {
+          queuePatch(String(day), {
+            note: v
+          });
+        }));
+        box.appendChild(makeInputRow("場所", schedule[day]?.place || "", v => {
+          queuePatch(String(day), {
+            place: v
+          });
+        }));
+        box.appendChild(makeTimeRow(day));
+        const counts = document.createElement("div");
+        counts.className = "counts";
+        const A = attendance[day] || {
+          morning: [],
+          afternoon: [],
+          after: [],
+          absent: [],
+          tardy: [],
+          early: []
+        };
+        const present = new Set([...(A.morning || []), ...(A.afternoon || []), ...(A.after || [])]);
+        const absent = (A.absent || []);
+        const tardy = (A.tardy || []);
+        const early = (A.early || []);
+        // 7割以下判定
+        const totalMembers = roster.length || 8;
+        if (hasActivity && (present.size / totalMembers) <= 0.7) {
+          box.classList.add("low-attendance");
+        }
+
+        counts.appendChild(makeBadge(`出席:${present.size}`, [...present]));
+        counts.appendChild(makeBadge(`欠席:${absent.length}`, absent));
+        counts.appendChild(makeBadgeSub(`遅刻:${tardy.length}`, tardy));
+        counts.appendChild(makeBadgeSub(`早退:${early.length}`, early));
+        if (!(schedule[day]?.morning || schedule[day]?.afternoon || schedule[day]?.after)) counts.style.opacity = .6;
+        box.appendChild(counts);
+
+        frag.appendChild(box);
+      }
+      cont.appendChild(frag);
+    }
+
+    /* === ダッシュボード === */
+    function computeAttendanceSummary() {
+      const last = new Date(currentYear, currentMonth, 0).getDate();
+      const activeDays = [];
+      for (let d = 1; d <= last; d++) {
+        if (schedule[d]?.morning || schedule[d]?.afternoon || schedule[d]?.after) activeDays.push(d);
+      }
+      const totalDays = activeDays.length;
+      const members = (roster && roster.length) ? roster.slice() : [];
+      const map = {};
+      members.forEach(n => map[n] = {
+        name: n,
+        present: 0,
+        absent: 0,
+        unknown: 0,
+        tardy: 0,
+        early: 0
+      });
+      activeDays.forEach(d => {
+        const A = attendance[d] || {
+          morning: [],
+          afternoon: [],
+          after: [],
+          absent: [],
+          tardy: [],
+          early: []
+        };
+        const presentSet = new Set([...(A.morning || []), ...(A.afternoon || []), ...(A.after || [])]);
+        const absentArr = A.absent || [];
+        const tardySet = new Set(A.tardy || []);
+        const earlySet = new Set(A.early || []);
+        members.forEach(n => {
+          if (presentSet.has(n)) map[n].present++;
+          else if (absentArr.includes(n)) map[n].absent++;
+          else map[n].unknown++;
+
+          if (tardySet.has(n)) map[n].tardy++;
+          if (earlySet.has(n)) map[n].early++;
+        });
+      });
+      const rows = Object.values(map);
+      return {
+        totalDays,
+        rows
+      };
+    }
+
+    function renderDashboard() {
+      const host = document.getElementById("dashboard");
+      if (!host) return;
+      const {
+        totalDays,
+        rows
+      } = computeAttendanceSummary();
+      if (totalDays === 0) {
+        host.innerHTML = `<div class="dash-card"><h3>ダッシュボード</h3><div class="meta-line">今月の実施日はありません。</div></div>`;
+        return;
+      }
+      rows.sort((a, b) => {
+        const ra = a.present / totalDays,
+          rb = b.present / totalDays;
+        if (rb !== ra) return rb - ra;
+        return (a.name || "").localeCompare(b.name || "", "ja");
+      });
+      const rowsHtml = rows.map(r => {
+        const rate = Math.round((r.present / totalDays) * 1000) / 10; // 0.1%刻み
+        const w = Math.max(0, Math.min(100, rate));
+        return `<tr onclick="showAdminGraph('${r.name}')" style="cursor:pointer">
+        <td class="n" style="text-decoration:underline;color:#a67c52;">${r.name}</td>
+        <td class="rate">${rate}%</td>
+        <td style="min-width:120px;"><div class="bar"><span style="width:${w}%;"></span></div></td>
+        <td class="cnts">出:${r.present}/${totalDays}・欠:${r.absent}・未:${r.unknown} <span class="mini">｜ 遅:${r.tardy}・早:${r.early}</span></td>
+      </tr>`;
+      }).join("");
+      host.innerHTML = `
+      <div class="dash-card">
+        <h3>ダッシュボード（部員別 出席率 / ${currentYear}年${currentMonth}月）</h3>
+        <div class="meta-line">母数＝「実施日」（午前/午後/業後のいずれかがONの日）の日数。遅刻/早退は別集計。</div>
+        <table>
+          <thead><tr><th class="n">名前</th><th class="rate">出席率</th><th>進捗</th><th>内訳</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>`;
+    }
+
+    /* === 送信 === */
+    function flushPatch(_, afterCb) {
+      if (Object.keys(unsavedPatch).length === 0) {
+        setStatus("変更はありません");
+        afterCb && afterCb();
+        return;
+      }
+      const patch = JSON.parse(JSON.stringify(unsavedPatch));
+      setLoading(true);
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res && res.schedule) schedule = res.schedule;
+          unsavedPatch = {};
+          markDirty();
+          render();
+          setStatus("登録しました。");
+          alert("登録しました。");
+          setLoading(false);
+          afterCb && afterCb();
+        })
+        .withFailureHandler(() => {
+          alert("登録に失敗しました。通信状況をご確認ください。");
+          setLoading(false);
+          afterCb && afterCb();
+        })
+        .saveSchedulePatch(currentYear, currentMonth, patch, "adminUI");
+    }
+
+    /* === 小物 === */
+    function halfHourList(startHour, endHour) {
+      const arr = [];
+      for (let h = startHour; h <= endHour; h++) {
+        for (let m of [0, 30]) {
+          if (h === endHour && m === 30) continue;
+          arr.push(`${('0'+h).slice(-2)}:${('0'+m).slice(-2)}`);
+        }
+      }
+      return arr;
+    }
+
+    function makeTimeSelect(value) {
+      const sel = document.createElement("select");
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = "--:--";
+      sel.appendChild(blank);
+      HH.forEach(t => {
+        const o = document.createElement("option");
+        o.value = t;
+        o.textContent = t;
+        if (t === value) o.selected = true;
+        sel.appendChild(o);
+      });
+      return sel;
+    }
+
+    function parseTimeRange(str) {
+      const m = String(str || "").match(/^(\d{1,2}):(\d{2})\s*~\s*(\d{1,2}):(\d{2})$/);
+      return m ? [`${('0'+m[1]).slice(-2)}:${m[2]}`, `${('0'+m[3]).slice(-2)}:${m[4]}`] : ["", ""];
+    }
+
+    function makeTimeRow(day) {
+      const row = document.createElement("div");
+      row.className = "row";
+      const lbl = document.createElement("div");
+      lbl.className = "label";
+      lbl.textContent = "時間";
+      row.appendChild(lbl);
+      let [st0, ed0] = parseTimeRange(schedule[day]?.time || "");
+      if (!HH.includes(st0)) st0 = "";
+      if (!HH.includes(ed0)) ed0 = "";
+      const st = makeTimeSelect(st0);
+      const sep = document.createElement("div");
+      sep.textContent = "~";
+      sep.style.minWidth = "1.2em";
+      sep.style.textAlign = "center";
+      const ed = makeTimeSelect(ed0);
+      const onChange = () => {
+        let s = st.value,
+          e = ed.value;
+        if (s && e && s > e) {
+          const tmp = s;
+          s = e;
+          e = tmp;
+          st.value = s;
+          ed.value = e;
+        }
+        const v = (s && e) ? `${s}~${e}` : "";
+        queuePatch(String(day), {
+          time: v
+        });
+        schedule[day].time = v;
+      };
+      st.addEventListener("change", onChange);
+      ed.addEventListener("change", onChange);
+      row.appendChild(st);
+      row.appendChild(sep);
+      row.appendChild(ed);
+      return row;
+    }
+
+    function makeBadge(text, names) {
+      const b = document.createElement("span");
+      b.className = "badge";
+      b.textContent = text;
+      b.title = names.join("\n");
+      b.onclick = () => alert(names.length ? `${text.split(':')[0]}:\n${names.join("\n")}` : "該当者なし");
+      return b;
+    }
+
+    function makeBadgeSub(text, names) {
+      const b = document.createElement("span");
+      b.className = "badge sub";
+      b.textContent = text;
+      b.title = names.join("\n");
+      b.onclick = () => alert(names.length ? `${text.split(':')[0]}:\n${names.join("\n")}` : "該当者なし");
+      return b;
+    }
+
+    function makeInputRow(label, value, onChange) {
+      const row = document.createElement("div");
+      row.className = "row";
+      const l = document.createElement("div");
+      l.className = "label";
+      l.textContent = label;
+      const t = document.createElement("input");
+      t.type = "text";
+      t.value = value;
+      t.addEventListener("input", () => {
+        onChange(t.value);
+      });
+      row.appendChild(l);
+      row.appendChild(t);
+      return row;
+    }
+
+    function autoScrollToToday() {
+      const now = new Date();
+      if (currentYear === now.getFullYear() && currentMonth === (now.getMonth() + 1)) {
+        const list = document.getElementById("calendar");
+        const idx = Math.max(0, now.getDate() - 1);
+        const target = list.children[idx];
+        if (target) {
+          target.classList.add("today");
+          setTimeout(() => {
+            target.scrollIntoView({
+              behavior: "smooth",
+              block: "center"
+            });
+          }, 300);
+        }
+      }
+    }
+    /* === クイック適用（選んだ曜日に一括） === */
+    function applyQuick(mode) {
+      let targetDays = null;
+      // 「未定を全てオフ」以外は曜日選択を必須とする
+      if (mode !== "UNDECIDED_OFF") {
+        targetDays = [...document.querySelectorAll('#weekdayGroup input:checked')].map(el => parseInt(el.value, 10));
+        if (!targetDays.length) {
+          alert("曜日を選択してください");
+          return;
+        }
+      }
+
+      const last = new Date(currentYear, currentMonth, 0).getDate();
+      const patch = {};
+      for (let d = 1; d <= last; d++) {
+        // 通常モードなら曜日でフィルタリング
+        if (mode !== "UNDECIDED_OFF") {
+          const w = new Date(currentYear, currentMonth - 1, d).getDay();
+          if (!targetDays.includes(w)) continue;
+        }
+
+        const base = schedule[d] || {
+          off: false,
+          morning: false,
+          afternoon: false,
+          after: false,
+          note: "",
+          place: "",
+          time: ""
+        };
+        if (mode === "UNDECIDED_OFF") {
+          // 活動予定がなく、かつ既にオフ設定もされていない場合のみ対象
+          const hasActivity = base.morning || base.afternoon || base.after;
+          if (!hasActivity && !base.off) {
+            patch[d] = {
+              off: true
+            };
+          }
+        } else if (mode === "M_ON") patch[d] = {
+          morning: true,
+          afternoon: base.afternoon,
+          after: base.after
+        };
+        else if (mode === "A_ON") patch[d] = {
+          morning: base.morning,
+          afternoon: true,
+          after: base.after
+        };
+        else if (mode === "F_ON") {
+          patch[d] = {
+            morning: base.morning,
+            afternoon: base.afternoon,
+            after: true
+          };
+          const t = (base.time || "").trim();
+          if (!t) {
+            const def = defaultAfterTimeRangeForDay(d);
+            if (def) {
+              (patch[d].time = def);
+            }
+          }
+        } else if (mode === "ALL_OFF") patch[d] = {
+          morning: false,
+          afternoon: false,
+          after: false
+        };
+      }
+      if (!Object.keys(patch).length) {
+        alert("変更対象の日がありません");
+        return;
+      }
+      Object.keys(patch).forEach(d => {
+        schedule[d] = schedule[d] || {
+          morning: false,
+          afternoon: false,
+          after: false,
+          note: "",
+          place: "",
+          time: ""
+        };
+        Object.assign(schedule[d], patch[d]);
+      });
+      Object.keys(patch).forEach(d => queuePatch(String(d), patch[d]));
+      markDirty();
+      render();
+      setStatus("一括変更をキューに入れました。右下の「登録」を押すと反映されます。");
+    }
+
+    /* === グラフ表示 === */
+    window.showAdminGraph = function(name) {
+      document.getElementById("adminChartArea").style.display = "block";
+      document.getElementById("chartTargetName").textContent = name;
+      google.script.run.withSuccessHandler(res => {
+        const ctx = document.getElementById('adminChart').getContext('2d');
+        if (adminChart) {
+          adminChart.destroy();
+        }
+        adminChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: res.months,
+            datasets: [{
+              label: name + 'の出席率(%)',
+              data: res.rates,
+              backgroundColor: '#a67c52',
+              borderRadius: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100
+              }
+            }
+          }
+        });
+        document.getElementById("adminChartArea").scrollIntoView({
+          behavior: "smooth"
+        });
+      }).getStatsForGraph(name, currentYear, currentMonth, 6);
+    };
+
+    // Scroll to Top Logic
+    const scrollBtn = document.getElementById("scrollTopBtn");
+    window.addEventListener("scroll", () => {
+      if (window.scrollY > 200) scrollBtn.classList.add("show");
+      else scrollBtn.classList.remove("show");
+    });
+    scrollBtn.addEventListener("click", () => {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+    });
+  </script>
+</body>
+
+</html>

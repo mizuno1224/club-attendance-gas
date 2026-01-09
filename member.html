@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <title>女子軟式野球部 出欠回答（部員用）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Rounded+Mplus+1c&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --tap-min-h: 68px;
+      --tap-pad: 14px;
+      --font: 1.06rem;
+      --font-lg: 1.18rem;
+      --font-xl: 1.28rem;
+      --chip-font: 1rem;
+      --max-btn-w: 600px;
+    }
+
+    html,
+    body {
+      background: #fefaf5;
+      color: #5a3e2b;
+      font-family: 'Rounded Mplus 1c', 'Arial', sans-serif;
+      margin: 0;
+    }
+
+    body {
+      padding: .6em;
+    }
+
+    header {
+      font-size: 1.6em;
+      text-align: center;
+      margin: .2em 0 .2em;
+      font-weight: 700;
+    }
+
+    .picker {
+      display: grid;
+      gap: .6em;
+      justify-items: center;
+      margin: .4em 0 .8em;
+    }
+
+    select,
+    input[type="text"] {
+      font-size: var(--font);
+      padding: 1.05em 1em;
+      border-radius: 12px;
+      width: 92%;
+      max-width: 360px;
+      border: 1px solid #a67c52;
+      background: #fff;
+    }
+
+    input[type="text"]::placeholder {
+      color: #b89a83;
+    }
+
+    .tab-container {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #fefaf5;
+      padding: .3em .5em;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .tab {
+      display: inline-block;
+      margin-right: 6px;
+      padding: .75em 1.25em;
+      border-radius: 12px 12px 0 0;
+      background: #d8bfa0;
+      color: #5a3e2b;
+      font-size: var(--font);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .tab.active {
+      background: #a67c52;
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .calendar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.1em;
+      padding: 0 .2em calc(7.5em + env(safe-area-inset-bottom));
+    }
+
+    .calendar-day-box {
+      background: #fff;
+      border: 1px solid #a67c52;
+      border-radius: 14px;
+      padding: 1em .95em;
+      box-sizing: border-box;
+      content-visibility: auto;
+      contain-intrinsic-size: 260px;
+      will-change: contents;
+    }
+
+    .calendar-day-box.sunday {
+      background: #f9d0d0;
+    }
+
+    .calendar-day-box.saturday {
+      background: #d0e7f9;
+    }
+
+    .calendar-day-box.off {
+      color: #7a7a7a;
+      padding: .6em .8em;
+      display: flex;
+      align-items: center;
+    }
+
+    .calendar-day-box.off.sunday {
+      background: #f9d0d0;
+    }
+
+    .calendar-day-box.off.saturday {
+      background: #d0e7f9;
+    }
+
+    .calendar-day-box.off .day-label {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .calendar-day-box.off .off-tag {
+      margin-left: .6em;
+      color: #666;
+      font-weight: 700;
+    }
+
+    .calendar-day-box.undecided {
+      border: 1px dashed #a67c52;
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    .calendar-day-box.low-attendance {
+      border: 2px solid #e74c3c;
+      background: #fff5f5;
+    }
+
+    .calendar-day-box.low-attendance .day-label::after {
+      content: "人数不足";
+      color: #e74c3c;
+      font-size: 0.75em;
+      margin-left: 0.5em;
+      border: 1px solid #e74c3c;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .calendar-day-box.off .event-note {
+      margin-left: 2ch;
+      margin-top: 0;
+      color: #7a5a43;
+      font-weight: 600;
+    }
+
+    .day-label {
+      font-weight: 800;
+      font-size: var(--font-xl);
+      margin-bottom: .2em;
+      display: flex;
+      align-items: center;
+      gap: .6em;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      font-size: var(--chip-font);
+      background: #e7d6c3;
+      color: #5a3e2b;
+      border-radius: 999px;
+      padding: 6px 12px;
+      border: none;
+    }
+
+    .event-note {
+      margin-top: .2em;
+      font-size: var(--font);
+      color: #7a5a43;
+      opacity: .95;
+      white-space: pre-wrap;
+    }
+
+    .event-info {
+      font-size: .98rem;
+      color: #7a5a43;
+      margin-top: .25em;
+      display: flex;
+      gap: 1em;
+      flex-wrap: wrap;
+    }
+
+    .event-info a {
+      color: #5a3e2b;
+      text-decoration: underline;
+    }
+
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: .6em;
+      margin-top: .5em;
+      padding: var(--tap-pad) .5em;
+      min-height: var(--tap-min-h);
+      font-size: var(--font-lg);
+      border-radius: 16px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    .time-row:active {
+      background: #f2e7dd;
+    }
+
+    .time-row-left {
+      display: flex;
+      align-items: center;
+      gap: .7em;
+      min-width: 8.2em;
+    }
+
+    .time-row-left input[type="checkbox"] {
+      width: 34px;
+      height: 34px;
+      pointer-events: none;
+      transform: scale(1.06);
+      border-radius: 8px;
+    }
+
+    .time-row-left span {
+      font-weight: 800;
+      pointer-events: none;
+    }
+
+    .spacer3 {
+      display: inline-block;
+      width: 3ch;
+      flex: 0 0 3ch;
+    }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: .7em;
+      flex: 1;
+      justify-content: flex-start;
+    }
+
+    .count-label {
+      background: #a67c52;
+      color: #fff;
+      border-radius: 12px;
+      padding: 6px 12px;
+      font-size: var(--chip-font);
+      font-weight: 800;
+      user-select: none;
+      white-space: nowrap;
+      min-width: 36px;
+      text-align: center;
+    }
+
+    .names {
+      font-size: var(--font);
+      color: #7a5a43;
+      line-height: 1.35;
+      word-break: break-all;
+    }
+
+    .skeleton {
+      position: relative;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #eee;
+      min-height: 1.1em;
+    }
+
+    .skeleton::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .55) 50%, rgba(255, 255, 255, 0) 100%);
+      transform: translateX(-100%);
+      animation: shimmer 1.1s infinite;
+    }
+
+    @keyframes shimmer {
+      100% {
+        transform: translateX(100%);
+      }
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      background: #333;
+      color: #fff;
+      padding: .6em .9em;
+      border-radius: 10px;
+      opacity: 0;
+      transition: opacity .25s;
+      z-index: 50;
+      font-size: 1rem;
+    }
+
+    .toast.show {
+      opacity: .95;
+    }
+
+    .save-btn {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: max(18px, calc(env(safe-area-inset-bottom) + 14px));
+      width: min(96%, var(--max-btn-w));
+      border: 1.5px solid #a67c52;
+      border-radius: 20px;
+      background: #a67c52;
+      color: #fff;
+      padding: 1.2em 1.7em;
+      font-size: var(--font-xl);
+      font-weight: 900;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, .25);
+      display: none;
+      z-index: 60;
+    }
+
+    .save-btn.dirty {
+      display: block;
+    }
+
+    .save-btn:active {
+      transform: translate(-50%, 1px);
+    }
+
+    .saving {
+      opacity: .6;
+      pointer-events: none;
+    }
+
+    @supports (padding:max(0px)) {
+      body {
+        padding-bottom: max(.6em, env(safe-area-inset-bottom));
+      }
+    }
+
+    /* ローディングオーバーレイ */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(254, 250, 245, .9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .spinner {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 6px solid #d8bfa0;
+      border-top-color: #a67c52;
+      animation: spin 1s linear infinite;
+    }
+
+    .loading-text {
+      margin-top: 12px;
+      color: #5a3e2b;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Graph */
+    .chart-container {
+      background: #fff;
+      border: 1px solid #a67c52;
+      border-radius: 12px;
+      padding: 1em;
+      margin: 0 0 1em;
+      display: none;
+    }
+
+    .chart-container.active {
+      display: block;
+    }
+
+    /* Scroll to Top Button */
+    .scroll-top-btn {
+      position: fixed;
+      right: 16px;
+      bottom: 80px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(166, 124, 82, 0.85);
+      color: #fff;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, .2);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 80;
+      transition: opacity .3s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .scroll-top-btn.show {
+      display: flex;
+    }
+
+    /* Today Highlight - Adjusted */
+    .calendar-day-box.today {
+      border: 3px solid #e67e22;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(230, 126, 34, 0.3);
+    }
+
+    .calendar-day-box.today::before {
+      content: "TODAY";
+      position: absolute;
+      top: 0;
+      /* Changed from -14px */
+      left: 0;
+      /* Changed from 10px */
+      background: #e67e22;
+      color: #fff;
+      font-size: 0.8rem;
+      padding: 3px 10px;
+      border-radius: 10px 0 10px 0;
+      font-weight: 800;
+      z-index: 2;
+    }
+  </style>
+</head>
+
+<body>
+  <header>女子軟式野球部 出欠回答（部員用）</header>
+
+  <div id="chartArea" class="chart-container">
+    <canvas id="attendanceChart" style="max-height:200px;"></canvas>
+  </div>
+
+  <div class="picker">
+    <select id="memberSelect" aria-label="名前を選択">
+      <option value="">（既存の名前から選択）</option>
+      <option value="ゆうり">ゆうり</option>
+      <option value="みゆ">みゆ</option>
+      <option value="のぞみ">のぞみ</option>
+      <option value="えみり">えみり</option>
+      <option value="まな">まな</option>
+      <option value="まほ">まほ</option>
+      <option value="まい">まい</option>
+      <option value="しん">しん</option>
+    </select>
+    <input id="memberInput" type="text" maxlength="20" placeholder="新しい名前を入力（例：はるか）" style="display:none;">
+  </div>
+
+  <div id="tabs" class="tab-container" role="tablist"></div>
+  <div id="calendarContainer" aria-live="polite"></div>
+
+  <button id="saveBtn" class="save-btn">この月の回答を送信</button>
+  <div id="toast" class="toast">保存しました</div>
+
+  <button id="scrollTopBtn" class="scroll-top-btn" aria-label="ページトップへ">▲</button>
+
+  <div id="loadingOverlay" class="overlay" aria-live="polite" aria-busy="true">
+    <div style="display:flex; flex-direction:column; align-items:center;">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="loading-text">読み込み中…</div>
+    </div>
+  </div>
+
+  <script>
+    /* ===== 設定（現在日時から自動算出） ===== */
+    const _now = new Date();
+    const startYear = _now.getFullYear();
+    const startMonth = _now.getMonth() + 1;
+    const monthsCount = 4; // 今月含めて4ヶ月分（3ヶ月先まで）
+
+    /* ===== 状態 ===== */
+    let currentYear = startYear,
+      currentMonth = startMonth;
+    let activitySchedule = {},
+      attendanceData = {},
+      holidays = {};
+    let roster = []; // 部員数計算用
+
+    let myChart = null; // Chart instance
+    let selectedMember = "",
+      customMember = "";
+    // day -> { status: "present" | "absent" | "clear", tardy?:boolean, early?:boolean }
+    const pending = {};
+    let isSaving = false;
+    const dom = {}; // dom[day] = {present:{cb,count,names}, absent:{cb,count,names}}
+    let io = null; // IntersectionObserver
+
+    /* ===== ローカルキャッシュ ===== */
+    const CACHE_VER = "v2";
+    const cacheKey = (y, m) => `club_member_cache_${CACHE_VER}_${y}-${('0'+m).slice(-2)}`;
+
+    function readCache(y, m) {
+      try {
+        const s = localStorage.getItem(cacheKey(y, m));
+        return s ? JSON.parse(s) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function writeCache(y, m, data) {
+      try {
+        localStorage.setItem(cacheKey(y, m), JSON.stringify({
+          ts: Date.now(),
+          data
+        }));
+      } catch (e) {}
+    }
+
+    function getActiveName() {
+      const name = (customMember || "").trim();
+      return name ? name : (selectedMember || "").trim();
+    }
+
+    function setLoading(on) {
+      const ov = document.getElementById('loadingOverlay');
+      if (!ov) return;
+      ov.classList.toggle('show', !!on);
+    }
+
+    function init() {
+      const savedSel = localStorage.getItem("club_member_name_sel") || "";
+      const savedCus = localStorage.getItem("club_member_name_custom") || "";
+      document.getElementById("memberSelect").value = savedSel;
+      selectedMember = savedSel;
+      document.getElementById("memberInput").value = savedCus;
+      customMember = savedCus;
+
+      buildTabsFromThisMonth();
+      document.getElementById("memberSelect").addEventListener("change", () => {
+        selectedMember = document.getElementById("memberSelect").value;
+        localStorage.setItem("club_member_name_sel", selectedMember || "");
+        refreshChecksForAllDays();
+        updateGraph();
+      });
+      document.getElementById("memberInput").addEventListener("input", () => {
+        customMember = document.getElementById("memberInput").value;
+        localStorage.setItem("club_member_name_custom", customMember || "");
+        refreshChecksForAllDays();
+        updateGraph();
+      });
+      document.getElementById("saveBtn").addEventListener("click", () => flushPending(true));
+
+      // 初期ロード時にもグラフ更新
+      if (getActiveName()) updateGraph();
+      document.getElementById("calendarContainer").addEventListener("click", onCalendarClick);
+
+      loadDataAndRender();
+    }
+
+    /* ===== タブ生成（当月以降のみ） ===== */
+    function buildTabsFromThisMonth() {
+      const tabs = document.getElementById("tabs");
+      tabs.innerHTML = "";
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const visible = [];
+      for (let i = 0; i < monthsCount; i++) {
+        let m = startMonth + i,
+          y = startYear;
+        if (m > 12) {
+          m -= 12;
+          y += 1;
+        }
+        const last = new Date(y, m, 0);
+        last.setHours(0, 0, 0, 0);
+        if (last >= today) visible.push({
+          y,
+          m
+        });
+      }
+      if (!visible.length) {
+        tabs.innerHTML = '<div style="padding:1em;color:#8a6b55;text-align:center;">対象月がありません。</div>';
+        document.getElementById("calendarContainer").innerHTML = "";
+        return;
+      }
+      currentYear = visible[0].y;
+      currentMonth = visible[0].m;
+      visible.forEach((o, idx) => {
+        const tab = document.createElement("div");
+        tab.textContent = `${o.y}年${o.m}月`;
+        tab.className = "tab" + (idx === 0 ? " active" : "");
+        tab.dataset.year = o.y;
+        tab.dataset.month = o.m;
+        tab.onclick = () => handleSwitchTab(tab);
+        tab.onkeypress = (e) => {
+          if (e.key === "Enter" || e.key === " ") handleSwitchTab(tab);
+        };
+        tabs.appendChild(tab);
+      });
+    }
+
+    function handleSwitchTab(tab) {
+      const go = () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        currentYear = parseInt(tab.dataset.year, 10);
+        currentMonth = parseInt(tab.dataset.month, 10);
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth"
+        });
+        loadDataAndRender();
+      };
+      if (Object.keys(pending).length > 0) {
+        flushPending(true, go);
+      } else {
+        go();
+      }
+    }
+
+    /* ===== データ読み込み（キャッシュ即描画 → 裏で最新取得） ===== */
+    function loadDataAndRender() {
+      setLoading(true);
+      const cached = readCache(currentYear, currentMonth);
+      if (cached && cached.data) {
+        const {
+          schedule: sch,
+          attendance: att,
+          holidays: hol
+        } = cached.data;
+        activitySchedule = sch || {};
+        attendanceData = att || {};
+        holidays = hol || {};
+        renderCalendar();
+        updateSaveButton();
+      }
+      google.script.run
+        .withSuccessHandler(res => {
+          activitySchedule = res.schedule || {};
+          attendanceData = res.attendance || {};
+          holidays = res.holidays || {};
+          roster = res.roster || []; // ロースター取得
+          writeCache(currentYear, currentMonth, {
+            schedule: activitySchedule,
+            attendance: attendanceData,
+            holidays,
+            roster
+          });
+          renderCalendar();
+          updateSaveButton();
+          prefetchNextMonth();
+          setLoading(false);
+        })
+        .withFailureHandler(err => {
+          if (!cached) alert("データの読み込みに失敗しました。再読み込みしてください。");
+          setLoading(false);
+        })
+        .getMemberData(currentYear, currentMonth);
+    }
+
+    function prefetchNextMonth() {
+      let y = currentYear,
+        m = currentMonth + 1;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
+      const endMonth = startMonth + monthsCount - 1;
+      const maxY = startYear + Math.floor((endMonth - 1) / 12);
+      const maxM = ((endMonth - 1) % 12) + 1;
+      const cmp = (y1, m1, y2, m2) => (y1 === y2 ? m1 - m2 : y1 - y2);
+      if (cmp(y, m, maxY, maxM) > 0) return;
+      if (readCache(y, m)) return;
+      google.script.run
+        .withSuccessHandler(res => {
+          const data = {
+            schedule: res.schedule || {},
+            attendance: res.attendance || {},
+            holidays: res.holidays || {}
+          };
+          writeCache(y, m, data);
+        })
+        .getMemberData(y, m);
+    }
+
+    /* ===== ユーティリティ ===== */
+    function showToast(msg = "保存しました") {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 1000);
+    }
+
+    function updateSaveButton() {
+      const btn = document.getElementById("saveBtn");
+      if (Object.keys(pending).length > 0) btn.classList.add("dirty");
+      else btn.classList.remove("dirty");
+    }
+
+    function queueChange(day, obj) {
+      pending[day] = obj;
+      updateSaveButton();
+    }
+
+    function renderCalendar() {
+      const container = document.getElementById("calendarContainer");
+      container.innerHTML = "";
+      Object.keys(dom).forEach(k => delete dom[k]);
+      if (io) {
+        io.disconnect();
+        io = null;
+      }
+
+      const lastDate = new Date(currentYear, currentMonth, 0).getDate();
+      const list = document.createElement("div");
+      list.className = "calendar-list";
+      const frag = document.createDocumentFragment();
+      // Today check
+      const now = new Date();
+      const isCurrentMonth = (currentYear === now.getFullYear() && currentMonth === (now.getMonth() + 1));
+      const todayDate = now.getDate();
+      let todayEl = null;
+      for (let day = 1; day <= lastDate; day++) {
+        const date = new Date(currentYear, currentMonth - 1, day),
+          w = date.getDay();
+        const card = document.createElement("div");
+        card.className = "calendar-day-box";
+        card.dataset.day = String(day);
+        card.dataset.hydrated = "0";
+        if (isCurrentMonth && day === todayDate) {
+          card.classList.add("today");
+          todayEl = card;
+        }
+
+        if (w === 0 || holidays[day]) card.classList.add("sunday");
+        else if (w === 6) card.classList.add("saturday");
+
+        const weekday = ["日", "月", "火", "水", "木", "金", "土"][w];
+        const dayLabel = document.createElement("div");
+        dayLabel.className = "day-label";
+        dayLabel.textContent = `${day}日（${weekday}）`;
+
+        const pills = [];
+        if (activitySchedule[day]?.morning) pills.push("午前");
+        if (activitySchedule[day]?.afternoon) pills.push("午後");
+        if (activitySchedule[day]?.after) pills.push("業後");
+        if (pills.length) {
+          const pill = document.createElement("span");
+          pill.className = "pill";
+          pill.textContent = `実施: ${pills.join(" / ")}`;
+          dayLabel.appendChild(pill);
+        }
+        card.appendChild(dayLabel);
+        // 管理者設定の「オフ」
+        if (activitySchedule[day]?.off) {
+          card.classList.add("off");
+          const offTag = document.createElement("span");
+          offTag.className = "off-tag";
+          offTag.textContent = "オフ";
+          dayLabel.appendChild(offTag);
+          if (activitySchedule[day]?.note) {
+            const note = document.createElement("div");
+            note.className = "event-note";
+            note.textContent = activitySchedule[day].note;
+            card.appendChild(note);
+          }
+          frag.appendChild(card);
+          continue;
+        }
+
+        // hasActivityの定義を追加
+        const hasActivity = !!(activitySchedule[day]?.morning || activitySchedule[day]?.afternoon || activitySchedule[day]?.after);
+        // 活動設定なし ＝ 「未定」
+        if (!hasActivity) {
+          card.classList.add("off", "undecided");
+          const offTag = document.createElement("span");
+          offTag.className = "off-tag";
+          offTag.textContent = "未定";
+          dayLabel.appendChild(offTag);
+          if (activitySchedule[day]?.note) {
+            const note = document.createElement("div");
+            note.className = "event-note";
+            note.textContent = activitySchedule[day].note;
+            card.appendChild(note);
+          }
+          frag.appendChild(card);
+          continue;
+        }
+
+        if (activitySchedule[day]?.note) {
+          const sk = document.createElement("div");
+          sk.className = "skeleton";
+          sk.style.height = "1.2em";
+          sk.style.marginTop = ".25em";
+          card.appendChild(sk);
+        }
+        const sk2 = document.createElement("div");
+        sk2.className = "skeleton";
+        sk2.style.height = "2.4em";
+        sk2.style.marginTop = ".55em";
+        card.appendChild(sk2);
+
+        frag.appendChild(card);
+      }
+
+      list.appendChild(frag);
+      container.appendChild(list);
+
+      io = new IntersectionObserver((entries) => {
+        for (const ent of entries) {
+          if (ent.isIntersecting) {
+            const el = ent.target;
+            const day = parseInt(el.dataset.day, 10);
+            if (el.dataset.hydrated !== "1") {
+              hydrateDayCard(el, day);
+            }
+            io.unobserve(el);
+          }
+        }
+      }, {
+        root: null,
+        rootMargin: "420px 0px",
+        threshold: 0.01
+      });
+      for (const card of container.querySelectorAll(".calendar-day-box")) {
+        if (card.classList.contains("off")) continue;
+        io.observe(card);
+      }
+
+      const first = Array.from(container.querySelectorAll(".calendar-day-box:not(.off)")).slice(0, 4);
+      const idle = window.requestIdleCallback || function(cb) {
+        return setTimeout(cb, 0);
+      };
+      idle(() => first.forEach(el => {
+        if (el && el.dataset.hydrated !== "1") {
+          hydrateDayCard(el, parseInt(el.dataset.day, 10));
+        }
+      }));
+      // Scroll to today
+      if (todayEl) {
+        setTimeout(() => {
+          todayEl.scrollIntoView({
+            behavior: "smooth",
+            block: "center"
+          });
+        }, 300);
+      }
+    }
+
+    function hydrateDayCard(card, day) {
+      card.dataset.hydrated = "1";
+      const keep = card.querySelector(".day-label");
+      card.innerHTML = "";
+      card.appendChild(keep);
+
+      if (activitySchedule[day]?.note) {
+        const note = document.createElement("div");
+        note.className = "event-note";
+        note.textContent = activitySchedule[day].note;
+        card.appendChild(note);
+      }
+      const place = activitySchedule[day]?.place || "",
+        timeStr = activitySchedule[day]?.time || "";
+      if (place || timeStr) {
+        const info = document.createElement("div");
+        info.className = "event-info";
+        if (place) {
+          if (/^https?:\/\//.test(place)) {
+            const a = document.createElement("a");
+            a.href = place;
+            a.target = "_blank";
+            a.textContent = "場所(地図)";
+            info.appendChild(a);
+          } else {
+            const s = document.createElement("span");
+            s.textContent = `場所: ${place}`;
+            info.appendChild(s);
+          }
+        }
+        if (timeStr) {
+          const s = document.createElement("span");
+          s.textContent = `時間: ${timeStr}`;
+          info.appendChild(s);
+        }
+        card.appendChild(info);
+      }
+
+      const presentRow = createRow(day, "present", "出席");
+      const absentRow = createRow(day, "absent", "欠席");
+      card.appendChild(presentRow.row);
+      card.appendChild(absentRow.row);
+
+      dom[day] = {
+        present: {
+          cb: presentRow.cb,
+          count: presentRow.count,
+          names: presentRow.names
+        },
+        absent: {
+          cb: absentRow.cb,
+          count: absentRow.count,
+          names: absentRow.names
+        }
+      };
+      updateCountsAndNames(day);
+      updateChecks(day);
+    }
+
+    function createRow(day, key, labelText) {
+      const row = document.createElement("div");
+      row.className = "time-row";
+      row.dataset.day = String(day);
+      row.dataset.key = key;
+      row.setAttribute("role", "button");
+      row.setAttribute("aria-label", `${day}日の${labelText}を切り替え`);
+
+      const left = document.createElement("div");
+      left.className = "time-row-left";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      const label = document.createElement("span");
+      label.textContent = labelText;
+      left.appendChild(cb);
+      left.appendChild(label);
+
+      const spacer = document.createElement("span");
+      spacer.className = "spacer3";
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const cnt = document.createElement("span");
+      cnt.className = "count-label";
+      const names = document.createElement("span");
+      names.className = "names";
+      meta.appendChild(cnt);
+      meta.appendChild(names);
+
+      row.appendChild(left);
+      row.appendChild(spacer);
+      row.appendChild(meta);
+      // 出席行だけ「遅刻/早退」ピル
+      if (key === "present") {
+        const chipBox = document.createElement("div");
+        chipBox.style.marginLeft = "auto";
+        chipBox.style.display = "flex";
+        chipBox.style.gap = "8px";
+
+        const mkChip = (flagKey, text) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.textContent = text;
+          b.className = "pill";
+          b.style.cursor = "pointer";
+          b.dataset.day = String(day);
+          b.dataset.flag = flagKey;
+          b.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleFlag(day, flagKey);
+          });
+          return b;
+        };
+        chipBox.appendChild(mkChip("tardy", "遅刻"));
+        chipBox.appendChild(mkChip("early", "早退"));
+        row.appendChild(chipBox);
+      }
+
+      return {
+        row,
+        cb,
+        count: cnt,
+        names
+      };
+    }
+
+    function onCalendarClick(e) {
+      const tr = e.target.closest('.time-row');
+      if (!tr) return;
+      const day = parseInt(tr.dataset.day, 10);
+      const key = tr.dataset.key;
+      if (!day || !key) return;
+
+      const activeName = getActiveName();
+      if (!activeName) {
+        alert("名前を選択するか、新しい名前を入力してください。");
+        return;
+      }
+
+      if (window.navigator && navigator.vibrate) {
+        try {
+          navigator.vibrate(12);
+        } catch (_) {}
+      }
+
+      const status = decideToggle(day, key, activeName);
+      const cur = pending[day] || {};
+      const next = {
+        status,
+        tardy: !!cur.tardy,
+        early: !!cur.early
+      };
+      pending[day] = next;
+      applyOptimistic(day, status, activeName, {
+        tardy: next.tardy,
+        early: next.early
+      });
+      queueChange(day, next);
+    }
+
+    function toggleFlag(day, flagKey) {
+      const p = pending[day] || {
+        status: "present"
+      };
+      p.status = (p.status === "absent") ? "present" : (p.status || "present");
+      p[flagKey] = !p[flagKey];
+      pending[day] = p;
+      updateSaveButton();
+      const activeName = getActiveName();
+      if (!activeName) return;
+      applyOptimistic(day, p.status, activeName, {
+        tardy: !!p.tardy,
+        early: !!p.early
+      });
+    }
+
+    function flushPending(force, after) {
+      const entries = Object.entries(pending);
+      if (!entries.length) {
+        after && after();
+        return;
+      }
+      const activeName = getActiveName();
+      if (!activeName) {
+        alert("名前を選択するか、新しい名前を入力してください。");
+        return;
+      }
+
+      const makeTimes = (day, obj) => {
+        const has = (k) => !!(activitySchedule[day] && activitySchedule[day][k]);
+        if (!obj || obj.status === "clear") return [];
+        if (obj.status === "absent") return ["absent"];
+        const t = [];
+        if (has("morning")) t.push("morning");
+        if (has("afternoon")) t.push("afternoon");
+        if (has("after")) t.push("after");
+        if (obj.tardy) t.push("tardy");
+        if (obj.early) t.push("early");
+        return t;
+      };
+      const changes = Object.entries(pending).map(([day, obj]) => {
+        const ts = makeTimes(parseInt(day, 10), obj);
+        return {
+          day: parseInt(day, 10),
+          times: ts,
+          allowEmpty: (obj && obj.status === "clear")
+        };
+      }).filter(ch => ch.times.length > 0 || ch.allowEmpty);
+      setLoading(true);
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res && res.ok) {
+            const days = res.days || {};
+            Object.keys(days).forEach(d => {
+              attendanceData[d] = days[d];
+              updateCountsAndNames(d);
+              updateChecks(d);
+              delete pending[d];
+            });
+            updateSaveButton();
+            writeCache(currentYear, currentMonth, {
+              schedule: activitySchedule,
+              attendance: attendanceData,
+              holidays
+            });
+            showToast("保存しました");
+            after && after();
+          } else {
+            alert(res && res.message ? res.message : "保存に失敗しました。");
+          }
+          setLoading(false);
+        })
+        .withFailureHandler(err => {
+          showToast("保存できません（通信エラー）。右下の送信で再試行できます。");
+          updateSaveButton();
+          after && after();
+          setLoading(false);
+        })
+        .saveMemberResponseBatch(activeName, currentYear, currentMonth, changes);
+    }
+
+    function decideToggle(day, key, activeName) {
+      const A = attendanceData[day] || {
+        morning: [],
+        afternoon: [],
+        after: [],
+        absent: []
+      };
+      const presentSet = new Set([...(A.morning || []), ...(A.afternoon || []), ...(A.after || [])]);
+      const isP = presentSet.has(activeName);
+      const isA = (A.absent || []).includes(activeName);
+      if (key === "present") {
+        return isP ? "clear" : "present";
+      } else {
+        return isA ? "clear" : "absent";
+      }
+    }
+
+    function applyOptimistic(day, status, activeName, flags) {
+      attendanceData[day] = attendanceData[day] || {
+        morning: [],
+        afternoon: [],
+        after: [],
+        absent: [],
+        tardy: [],
+        early: []
+      };
+      ["morning", "afternoon", "after", "absent", "tardy", "early"].forEach(k => {
+        attendanceData[day][k] = (attendanceData[day][k] || []).filter(n => n !== activeName);
+      });
+      if (status === "present") {
+        if (activitySchedule[day]?.morning) attendanceData[day].morning.push(activeName);
+        if (activitySchedule[day]?.afternoon) attendanceData[day].afternoon.push(activeName);
+        if (activitySchedule[day]?.after) attendanceData[day].after.push(activeName);
+        if (flags && flags.tardy) attendanceData[day].tardy.push(activeName);
+        if (flags && flags.early) attendanceData[day].early.push(activeName);
+      } else if (status === "absent") {
+        attendanceData[day].absent.push(activeName);
+      }
+      updateCountsAndNames(day);
+      updateChecks(day);
+    }
+
+    function updateCountsAndNames(day) {
+      const A = attendanceData[day] || {
+        morning: [],
+        afternoon: [],
+        after: [],
+        absent: [],
+        tardy: [],
+        early: []
+      };
+      const present = [...new Set([...(A.morning || []), ...(A.afternoon || []), ...(A.after || [])])];
+      const absent = (A.absent || []);
+      const tardySet = new Set(A.tardy || []);
+      const earlySet = new Set(A.early || []);
+      const d = dom[day];
+      if (!d) return;
+
+      d.present.count.textContent = present.length;
+      d.absent.count.textContent = absent.length;
+      const decorated = present.map(n => {
+        const marks = [(tardySet.has(n) ? "遅" : ""), (earlySet.has(n) ? "早" : "")].join("");
+        return marks ? `${n}（${marks}）` : n;
+      });
+      d.present.names.textContent = decorated.join("、");
+      d.absent.names.textContent = absent.join("、");
+
+      // 人数不足判定 (7割以下ならオフ扱い)
+      const totalMembers = roster.length || 8; // デフォルト8名
+      const rate = present.length / totalMembers;
+      const card = d.present.cb.closest('.calendar-day-box');
+      if (card) {
+        if (rate <= 0.7) {
+          card.classList.add("low-attendance");
+        } else {
+          card.classList.remove("low-attendance");
+        }
+      }
+    }
+
+    function updateChecks(day) {
+      const A = attendanceData[day] || {
+        morning: [],
+        afternoon: [],
+        after: [],
+        absent: []
+      };
+      const activeName = getActiveName();
+      const presentSet = new Set([...(A.morning || []), ...(A.afternoon || []), ...(A.after || [])]);
+      const isP = activeName && presentSet.has(activeName);
+      const isA = activeName && (A.absent || []).includes(activeName);
+      const d = dom[day];
+      if (!d) return;
+      d.present.cb.checked = !!isP;
+      d.absent.cb.checked = !!isA;
+      const dis = !activeName;
+      d.present.cb.disabled = dis;
+      d.absent.cb.disabled = dis;
+      const presentRow = d.present.cb.closest('.time-row');
+      const absentRow = d.absent.cb.closest('.time-row');
+      if (presentRow) presentRow.setAttribute('aria-pressed', d.present.cb.checked ? 'true' : 'false');
+      if (absentRow) absentRow.setAttribute('aria-pressed', d.absent.cb.checked ? 'true' : 'false');
+    }
+
+    function refreshChecksForAllDays() {
+      for (const day in dom) {
+        updateChecks(day);
+      }
+    }
+
+    /* ===== グラフ描画 ===== */
+    function updateGraph() {
+      const name = getActiveName();
+      const area = document.getElementById("chartArea");
+      if (!name) {
+        area.classList.remove("active");
+        return;
+      }
+
+      area.classList.add("active");
+      google.script.run.withSuccessHandler(res => {
+        const ctx = document.getElementById('attendanceChart').getContext('2d');
+        if (myChart) {
+          myChart.destroy();
+        }
+
+        myChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: res.months,
+            datasets: [{
+              label: name + 'の出席率(%)',
+              data: res.rates,
+              backgroundColor: '#a67c52',
+              borderRadius: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100
+              }
+            }
+          }
+        });
+      }).getStatsForGraph(name, startYear, startMonth, monthsCount);
+    }
+
+    // Scroll to Top Logic
+    const scrollBtn = document.getElementById("scrollTopBtn");
+    window.addEventListener("scroll", () => {
+      if (window.scrollY > 200) scrollBtn.classList.add("show");
+      else scrollBtn.classList.remove("show");
+    });
+    scrollBtn.addEventListener("click", () => {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+    });
+
+    window.onload = init;
+  </script>
+</body>
+
+</html>

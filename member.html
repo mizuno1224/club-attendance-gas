@@ -1184,12 +1184,11 @@
       d.present.names.textContent = decorated.join("、");
       d.absent.names.textContent = absent.join("、");
 
-      // 人数不足判定 (7割以下ならオフ扱い)
-      const totalMembers = roster.length || 8; // デフォルト8名
-      const rate = present.length / totalMembers;
+      // 人数不足判定 (8人回答時点で参加4人以下なら警告)
+      const answeredCount = present.length + absent.length;
       const card = d.present.cb.closest('.calendar-day-box');
       if (card) {
-        if (rate <= 0.7) {
+        if (answeredCount >= 8 && present.length <= 4) {
           card.classList.add("low-attendance");
         } else {
           card.classList.remove("low-attendance");

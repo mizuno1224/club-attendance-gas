@@ -101,7 +101,7 @@
       padding: 0 .6em 5.5em;
     }
 
-    /* 表示高速化：画面外の描画を遅延（推定サイズを与える） */
+    /* 表示高速化：画面外の描画を遅延 */
     .calendar-day {
       background: #fff;
       border: 1px solid #a67c52;
@@ -109,6 +109,7 @@
       padding: .7em;
       content-visibility: auto;
       contain-intrinsic-size: 240px;
+      transition: all 0.3s ease;
     }
 
     .calendar-day.undecided {
@@ -148,6 +149,7 @@
       align-items: center;
       gap: .6em;
       margin-bottom: .4em;
+      cursor: pointer; /* 折りたたみ用 */
     }
 
     .day-title {
@@ -221,6 +223,49 @@
 
     .badge.sub {
       background: #7b5b3f;
+    }
+
+    /* 折りたたみ機能 */
+    .calendar-day.collapsed .day-body {
+      display: none;
+    }
+    .calendar-day.collapsed {
+      padding-bottom: .4em;
+      opacity: 0.7;
+    }
+    .toggle-icon {
+      margin-left: auto;
+      font-size: 0.8em;
+      color: #a67c52;
+      transform: rotate(0deg);
+      transition: transform 0.2s;
+    }
+    .calendar-day.collapsed .toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    /* スケルトンスクリーン（読み込み中の骨組み） */
+    .skeleton-box {
+      background: #fff;
+      border: 1px solid #e0d4c6;
+      border-radius: 12px;
+      padding: 1em;
+      height: 180px;
+    }
+    .skeleton-line {
+      height: 1.2em;
+      background: #eee;
+      margin-bottom: 0.8em;
+      border-radius: 4px;
+      animation: pulse 1.5s infinite;
+    }
+    .skeleton-line.short { width: 40%; }
+    .skeleton-line.long { width: 80%; }
+    
+    @keyframes pulse {
+      0% { opacity: 0.6; }
+      50% { opacity: 1; }
+      100% { opacity: 0.6; }
     }
 
     #saveAllBtn {
@@ -399,9 +444,7 @@
       content: "TODAY";
       position: absolute;
       top: 0;
-      /* Changed from -14px */
       left: 0;
-      /* Changed from -2px */
       background: #d35400;
       color: #fff;
       font-size: 0.8rem;
@@ -479,7 +522,7 @@
     const HH = halfHourList(6, 21);
 
     /* === 管理者ページ用キャッシュ === */
-    const ADMIN_CACHE_VER = "v2"; // ← 遅刻/早退対応
+    const ADMIN_CACHE_VER = "v2"; 
     const adminCacheKey = (y, m) => `club_admin_cache_${ADMIN_CACHE_VER}_${y}-${('0'+m).slice(-2)}`;
 
     function readAdminCache(y, m) {
@@ -507,16 +550,36 @@
       document.getElementById("qAfternoonOn").onclick = () => applyQuick("A_ON");
       document.getElementById("qAfterOn").onclick = () => applyQuick("F_ON");
       document.getElementById("qAllOff").onclick = () => applyQuick("ALL_OFF");
-      document.getElementById("qUndecidedOff").onclick = () => applyQuick("UNDECIDED_OFF"); // 追加
+      document.getElementById("qUndecidedOff").onclick = () => applyQuick("UNDECIDED_OFF");
       document.getElementById("qClearCheck").onclick = () => document.querySelectorAll('#weekdayGroup input:checked').forEach(el => el.checked = false);
       document.getElementById("saveAllBtn").onclick = () => flushPatch();
       loadMonth();
     })();
     /* === ローディング === */
     function setLoading(on) {
+      // 画面全体を覆うローディングは、データ送信時のみ使うように変更（体感速度向上のため）
       const ov = document.getElementById('loadingOverlay');
       if (!ov) return;
       ov.classList.toggle('show', !!on);
+    }
+
+    /* === スケルトン表示（読み込み中の骨組み） === */
+    function renderSkeletons() {
+       const cont = document.getElementById("calendar");
+       cont.innerHTML = "";
+       const last = new Date(currentYear, currentMonth, 0).getDate();
+       const frag = document.createDocumentFragment();
+       for(let i=0; i<last; i++) {
+         const div = document.createElement("div");
+         div.className = "skeleton-box";
+         div.innerHTML = `<div class="skeleton-line short"></div><div class="skeleton-line long"></div><div class="skeleton-line long"></div>`;
+         frag.appendChild(div);
+       }
+       cont.appendChild(frag);
+       
+       // ダッシュボードもスケルトンに
+       const dash = document.getElementById("dashboard");
+       dash.innerHTML = `<div class="dash-card"><div class="skeleton-line short"></div><div class="skeleton-line long"></div></div>`;
     }
 
     /* === タブ === */
@@ -572,10 +635,7 @@
         currentYear = parseInt(el.dataset.year, 10);
         currentMonth = parseInt(el.dataset.month, 10);
         loadMonth();
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth"
-        });
+        // スクロールはデータ描画後に行うためここではトップへ戻さない
       };
       if (Object.keys(unsavedPatch).length > 0) {
         flushPatch(null, go);
@@ -605,7 +665,10 @@
 
     /* === 月データ読み込み（キャッシュ→最新差替え＋次月先読み） === */
     function loadMonth() {
-      setLoading(true);
+      // 1. まずスケルトンを表示して「反応した」と思わせる
+      renderSkeletons();
+      
+      // 2. キャッシュがあれば即描画
       const cached = readAdminCache(currentYear, currentMonth);
       if (cached && cached.data) {
         schedule = cached.data.schedule || {};
@@ -614,9 +677,11 @@
         roster = cached.data.roster || [];
         unsavedPatch = {};
         markDirty();
-        render();
+        render(); // 即座に描画
         autoScrollToToday();
       }
+
+      // 3. サーバーから最新取得
       google.script.run.withSuccessHandler(res => {
         schedule = res.schedule || {};
         attendance = res.attendance || {};
@@ -624,7 +689,7 @@
         roster = res.roster || [];
         unsavedPatch = {};
         markDirty();
-        render();
+        render(); // 最新データで再描画
         autoScrollToToday();
         writeAdminCache(currentYear, currentMonth, {
           schedule,
@@ -633,12 +698,10 @@
           roster
         });
         prefetchNextMonth();
-        setLoading(false);
       }).withFailureHandler(err => {
         if (!cached) {
           alert("データの読み込みに失敗しました。再読み込みしてください。");
         }
-        setLoading(false);
       }).getAdminData(currentYear, currentMonth);
     }
 
@@ -683,20 +746,38 @@
       cont.innerHTML = "";
       const last = new Date(currentYear, currentMonth, 0).getDate();
       const frag = document.createDocumentFragment();
+      const todayDate = new Date();
+      const isThisMonth = (currentYear === todayDate.getFullYear() && currentMonth === (todayDate.getMonth()+1));
+      const todayD = todayDate.getDate();
+
       for (let day = 1; day <= last; day++) {
         const date = new Date(currentYear, currentMonth - 1, day);
         const w = date.getDay();
         const box = document.createElement("div");
         box.className = "calendar-day";
+        box.dataset.day = day; // for toggle
+
         if (w === 0 || holidays[day]) box.classList.add("sunday");
         else if (w === 6) box.classList.add("saturday");
+
+        // 今日より前ならデフォルトで折りたたむ（高速化と見やすさのため）
+        if (isThisMonth && day < todayD) {
+          box.classList.add("collapsed");
+        }
 
         const weekday = ["日", "月", "火", "水", "木", "金", "土"][w];
         const head = document.createElement("div");
         head.className = "day-head";
+        head.onclick = (e) => {
+           // クリックで折りたたみ切り替え
+           if(!e.target.closest('.chip')) {
+             box.classList.toggle('collapsed');
+           }
+        };
+
         const title = document.createElement("div");
         title.className = "day-title";
-        title.textContent = `${day}日（${weekday}）`;
+        title.innerHTML = `${day}日（${weekday}）<span class="toggle-icon">▼</span>`;
         if (holidays[day]) {
           const tag = document.createElement("span");
           tag.className = "holiday-tag";
@@ -704,13 +785,19 @@
           title.appendChild(tag);
         }
         head.appendChild(title);
+        
+        // --- 内部コンテンツ（折りたたみ対象） ---
+        const bodyDiv = document.createElement("div");
+        bodyDiv.className = "day-body";
+
         const sw = document.createElement("div");
         sw.className = "switches";
         const mk = (key, label, dayNo) => {
           const c = document.createElement("div");
           c.className = "chip";
           c.textContent = label;
-          c.onclick = () => {
+          c.onclick = (e) => {
+            e.stopPropagation(); // 親の折りたたみ暴発防止
             schedule[dayNo] = schedule[dayNo] || {
               off: false,
               morning: false,
@@ -770,28 +857,31 @@
         sw.appendChild(ca);
         sw.appendChild(cf);
         sw.appendChild(coff);
-        head.appendChild(sw);
-        box.appendChild(head);
+        
+        // ヘッダーにスイッチは入れない（折りたたまれても見たい場合はここに移動も可だが、今回はBodyへ）
+        bodyDiv.appendChild(sw);
+        
+        box.appendChild(head); // ヘッダー追加
 
         const hasActivity = schedule[day]?.morning || schedule[day]?.afternoon || schedule[day]?.after;
         if (schedule[day]?.off) {
           box.classList.add("off-day");
         } else if (!hasActivity) {
           box.classList.add("undecided");
-          title.textContent += "（未定）";
+          title.innerHTML += " <span style='font-weight:normal;font-size:0.9em;'>（未定）</span>";
         }
 
-        box.appendChild(makeInputRow("イベント", schedule[day]?.note || "", v => {
+        bodyDiv.appendChild(makeInputRow("イベント", schedule[day]?.note || "", v => {
           queuePatch(String(day), {
             note: v
           });
         }));
-        box.appendChild(makeInputRow("場所", schedule[day]?.place || "", v => {
+        bodyDiv.appendChild(makeInputRow("場所", schedule[day]?.place || "", v => {
           queuePatch(String(day), {
             place: v
           });
         }));
-        box.appendChild(makeTimeRow(day));
+        bodyDiv.appendChild(makeTimeRow(day));
         const counts = document.createElement("div");
         counts.className = "counts";
         const A = attendance[day] || {
@@ -806,9 +896,9 @@
         const absent = (A.absent || []);
         const tardy = (A.tardy || []);
         const early = (A.early || []);
-        // 7割以下判定
-        const totalMembers = roster.length || 8;
-        if (hasActivity && (present.size / totalMembers) <= 0.7) {
+        // 人数不足判定 (8人回答時点で参加4人以下なら警告)
+        const answeredCount = present.size + absent.length;
+        if (hasActivity && answeredCount >= 8 && present.size <= 4) {
           box.classList.add("low-attendance");
         }
 
@@ -817,8 +907,9 @@
         counts.appendChild(makeBadgeSub(`遅刻:${tardy.length}`, tardy));
         counts.appendChild(makeBadgeSub(`早退:${early.length}`, early));
         if (!(schedule[day]?.morning || schedule[day]?.afternoon || schedule[day]?.after)) counts.style.opacity = .6;
-        box.appendChild(counts);
-
+        bodyDiv.appendChild(counts);
+        
+        box.appendChild(bodyDiv); // ボディ追加
         frag.appendChild(box);
       }
       cont.appendChild(frag);
@@ -917,7 +1008,7 @@
         return;
       }
       const patch = JSON.parse(JSON.stringify(unsavedPatch));
-      setLoading(true);
+      setLoading(true); // 送信時のみ全画面ローディング
       google.script.run
         .withSuccessHandler(res => {
           if (res && res.schedule) schedule = res.schedule;

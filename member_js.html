@@ -43,8 +43,6 @@
     } catch (e) {}
   }
   
-  // (以下、前回のコードと同じ内容ですが、全量省略せずに記述します)
-  
   function getActiveName() {
     const name = (customMember || "").trim();
     return name ? name : (selectedMember || "").trim();
@@ -362,7 +360,8 @@
         if (pills.length > 0) {
             const hint = document.createElement("span");
             hint.className = "request-hint";
-            hint.textContent = "※活動希望があれば下の「希望」をチェック";
+            // ★変更: 注釈テキストを「自主練（顧問不在の可能性あり）」に変更
+            hint.textContent = "※顧問不在の可能性がありますが、自分たちで活動する場合は「自主練」をチェック";
             dayLabel.appendChild(hint);
         }
 
@@ -480,7 +479,8 @@
 
     if (hasActivity) {
         const isOff = !!sch.off;
-        const presentLabel = isOff ? "希望" : "出席";
+        // ★変更: 「休み」かつ活動時間がある場合は「自主練」と表記
+        const presentLabel = isOff ? "自主練" : "出席";
 
         const presentRow = createRow(day, "present", presentLabel);
         card.appendChild(presentRow.row);

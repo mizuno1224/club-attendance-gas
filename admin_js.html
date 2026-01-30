@@ -19,7 +19,6 @@
   const HH = halfHourList(6, 21);
 
   /* === キャッシュ === */
-  // ★変更: バージョンを "v6" に更新
   const ADMIN_CACHE_VER = "v6"; 
   const adminCacheKey = (y, m) => `club_admin_cache_${ADMIN_CACHE_VER}_${y}-${('0'+m).slice(-2)}`;
 
@@ -40,8 +39,6 @@
       }));
     } catch (e) {}
   }
-  
-  // (以下、管理者画面のロジックは変更ありませんが、全量省略せずに記述します)
   
   /* === 初期化 === */
   (function init() {
@@ -123,7 +120,13 @@
       loadMonth();
     };
     if (Object.keys(unsavedPatch).length > 0) {
-      flushPatch(null, go);
+      if(confirm("保存されていない変更があります。保存して移動しますか？\n（キャンセルで破棄して移動）")) {
+        flushPatch(null, go);
+      } else {
+        unsavedPatch = {};
+        markDirty();
+        go();
+      }
     } else {
       go();
     }
@@ -134,7 +137,8 @@
   }
 
   function queuePatch(day, fields) {
-    unsavedPatch[day] = Object.assign({}, unsavedPatch[day] || {}, fields);
+    // 既存のパッチと新しいフィールドをマージする
+    unsavedPatch[day] = { ...(unsavedPatch[day] || {}), ...fields };
     markDirty();
   }
 
@@ -286,7 +290,6 @@
         };
         cell.appendChild(countEl);
       } else if (sch && sch.off && count === 0) {
-         // 完全オフの場合は何も表示しないか、ハイフンなど
          const noEl = document.createElement("div");
          noEl.className = "cal-count";
          noEl.style.fontSize = "0.8rem";
@@ -344,9 +347,9 @@
       const head = document.createElement("div");
       head.className = "day-head";
       head.onclick = (e) => {
-         if(!e.target.closest('.chip')) {
-           box.classList.toggle('collapsed');
-         }
+          if(!e.target.closest('.chip')) {
+            box.classList.toggle('collapsed');
+          }
       };
 
       const title = document.createElement("div");
@@ -363,6 +366,7 @@
       const bodyDiv = document.createElement("div");
       bodyDiv.className = "day-body";
 
+      // スイッチ（チップ）
       const sw = document.createElement("div");
       sw.className = "switches";
       const mk = (key, label, dayNo) => {
@@ -403,10 +407,12 @@
         };
         return c;
       };
+      
       const cm = mk("morning", "午前", day),
         ca = mk("afternoon", "午後", day),
         cf = mk("after", "業後", day),
         coff = mk("off", "オフ", day);
+      
       if (schedule[day]?.morning) cm.classList.add("on");
       if (schedule[day]?.afternoon) ca.classList.add("on");
       if (schedule[day]?.after) cf.classList.add("on");
@@ -418,7 +424,6 @@
       sw.appendChild(coff);
       
       bodyDiv.appendChild(sw);
-      
       box.appendChild(head);
 
       const hasActivity = schedule[day]?.morning || schedule[day]?.afternoon || schedule[day]?.after;
@@ -429,13 +434,20 @@
         title.innerHTML += " <span style='font-weight:normal;font-size:0.9em;'>（未定）</span>";
       }
 
+      // 修正: テキスト入力時にscheduleも更新する
       bodyDiv.appendChild(makeInputRow("イベント", schedule[day]?.note || "", v => {
+        ensureSchedule(day);
+        schedule[day].note = v; // ここで即時反映
         queuePatch(String(day), { note: v });
       }));
       bodyDiv.appendChild(makeInputRow("場所", schedule[day]?.place || "", v => {
+        ensureSchedule(day);
+        schedule[day].place = v; // ここで即時反映
         queuePatch(String(day), { place: v });
       }));
       bodyDiv.appendChild(makeTimeRow(day));
+      
+      // 人数・バッジ
       const counts = document.createElement("div");
       counts.className = "counts";
       const A = attendance[day] || {
@@ -458,7 +470,7 @@
       const presentLabel = schedule[day]?.off ? `希望:${present.size}` : `出席:${present.size}`;
       const b = makeBadge(presentLabel, [...present]);
       if (schedule[day]?.off && present.size > 0) {
-           b.classList.add("request");
+            b.classList.add("request");
       }
       counts.appendChild(b);
       
@@ -475,6 +487,20 @@
       frag.appendChild(box);
     }
     cont.appendChild(frag);
+  }
+
+  function ensureSchedule(day) {
+    if (!schedule[day]) {
+      schedule[day] = {
+        off: false,
+        morning: false,
+        afternoon: false,
+        after: false,
+        note: "",
+        place: "",
+        time: ""
+      };
+    }
   }
 
   function computeAttendanceSummary() {
@@ -625,7 +651,11 @@
     lbl.className = "label";
     lbl.textContent = "時間";
     row.appendChild(lbl);
-    let [st0, ed0] = parseTimeRange(schedule[day]?.time || "");
+    
+    // schedule[day] が未定義の場合のガード
+    const sch = schedule[day] || {};
+    
+    let [st0, ed0] = parseTimeRange(sch.time || "");
     if (!HH.includes(st0)) st0 = "";
     if (!HH.includes(ed0)) ed0 = "";
     const st = makeTimeSelect(st0);
@@ -635,6 +665,7 @@
     sep.style.textAlign = "center";
     const ed = makeTimeSelect(ed0);
     const onChange = () => {
+      ensureSchedule(day);
       let s = st.value,
         e = ed.value;
       if (s && e && s > e) {

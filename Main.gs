@@ -5,7 +5,10 @@
 function doGet(e) {
   var page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : "member";
   var fileName = (page === "admin") ? "admin" : "member";
-  return HtmlService.createHtmlOutputFromFile(fileName).setTitle("女子軟式野球部").setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return HtmlService.createHtmlOutputFromFile(fileName)
+    .setTitle("女子軟式野球部")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
 
 function onOpen() {
@@ -50,8 +53,7 @@ function openAdminSidebar() {
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
-// ...既存のコードの末尾...
-
+// HTMLファイル内で <?!= include('filename'); ?> として呼び出す関数
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }

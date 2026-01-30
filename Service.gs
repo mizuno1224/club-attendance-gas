@@ -15,12 +15,13 @@ function _getRoster() {
 
 /* ---------- Holidays (Japan) ---------- */
 function _getHolidaysMap(year, month) {
-  const key = "HOLIDAY_CACHE_" + year + "_" + month;
+  // ★変更: キーを V6 に変更
+  const key = "HOLIDAY_CACHE_V6_" + year + "_" + month;
   const cache = CacheService.getScriptCache();
   const cached = cache.get(key);
   if (cached) return JSON.parse(cached);
   try {
-    // 修正: 公式の祝日のみを含むカレンダーIDに変更（節分などの行事を除外）
+    // 公式の祝日のみ
     const calId = 'ja.japanese.official#holiday@group.v.calendar.google.com';
     const cal = CalendarApp.getCalendarById(calId);
     if (!cal) return {};
@@ -35,7 +36,7 @@ function _getHolidaysMap(year, month) {
         map[d.getDate()] = e.getTitle();
       }
     });
-    cache.put(key, JSON.stringify(map), 21600); // 6時間キャッシュ
+    cache.put(key, JSON.stringify(map), 21600);
     return map;
   } catch (err) {
     return {};
@@ -76,13 +77,11 @@ function getAttendanceForMonth(year, month, optValues) {
 
 // 共通データ取得関数（キャッシュ対応）
 function _fetchDataWithCache(year, month) {
-  // 静的データ（スケジュール・名簿・祝日）のキャッシュキー
-  const staticKey = "STATIC_" + year + "_" + month; 
-  // 動的データ（出席）のキャッシュキー
-  const attendanceKey = "ATTENDANCE_" + year + "_" + month;
+  // ★変更: キャッシュキーに "V6" を含める（これで確実に古いデータを無視します）
+  const staticKey = "STATIC_V6_" + year + "_" + month;
+  const attendanceKey = "ATTENDANCE_V6_" + year + "_" + month;
   
   const cache = CacheService.getScriptCache();
-  
   let scheduleData, rosterData, holidaysData, attendanceData;
 
   // 1. 静的データの取得
@@ -105,7 +104,7 @@ function _fetchDataWithCache(year, month) {
         schedule: scheduleData,
         roster: rosterData,
         holidays: holidaysData
-      }), 21600); // 6時間
+      }), 21600);
     } catch (e) {}
   }
 
@@ -138,7 +137,6 @@ function getPersonalStats(name, startYear, startMonth, count) {
   const months = [];
   const rates = [];
 
-  // Optimization: Fetch all data once
   const sSh = _getScheduleSheet();
   const sVals = sSh ? sSh.getDataRange().getValues() : [];
   const aSh = _getAttendanceSheet();
@@ -150,13 +148,10 @@ function getPersonalStats(name, startYear, startMonth, count) {
 
     let totalDays = 0;
     let presentCount = 0;
-    // その月の日数分ループ
     const last = new Date(y, m, 0).getDate();
     for (let d = 1; d <= last; d++) {
-      // 活動がある日か判定
       if (s[d] && (s[d].morning || s[d].afternoon || s[d].after)) {
         totalDays++;
-        // 出席判定
         const A = a[d] || {};
         const pSet = new Set([...(A.morning || []), ...(A.afternoon || []), ...(A.after || [])]);
         if (pSet.has(name)) presentCount++;
@@ -175,4 +170,16 @@ function getPersonalStats(name, startYear, startMonth, count) {
     }
   }
   return { months, rates };
+}
+
+/* ---------- Utils for Cache Clearing ---------- */
+// ※ Controller.gsで呼ばれているがコードに見当たらないため、念のためここに追加・確認してください
+function _clearCache(year, month) {
+  const cache = CacheService.getScriptCache();
+  // Service.gs内のキーと一致させる必要があります
+  cache.remove("STATIC_V6_" + year + "_" + month);
+  cache.remove("ATTENDANCE_V6_" + year + "_" + month);
+  // 念のため古い形式も削除
+  cache.remove("STATIC_" + year + "_" + month);
+  cache.remove("ATTENDANCE_" + year + "_" + month);
 }

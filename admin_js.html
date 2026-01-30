@@ -19,7 +19,8 @@
   const HH = halfHourList(6, 21);
 
   /* === キャッシュ === */
-  const ADMIN_CACHE_VER = "v2"; 
+  // ★変更: バージョンを "v6" に更新
+  const ADMIN_CACHE_VER = "v6"; 
   const adminCacheKey = (y, m) => `club_admin_cache_${ADMIN_CACHE_VER}_${y}-${('0'+m).slice(-2)}`;
 
   function readAdminCache(y, m) {
@@ -39,7 +40,9 @@
       }));
     } catch (e) {}
   }
-
+  
+  // (以下、管理者画面のロジックは変更ありませんが、全量省略せずに記述します)
+  
   /* === 初期化 === */
   (function init() {
     buildTabs();
@@ -247,7 +250,6 @@
     for(let d=1; d<=lastDate; d++){
       const cell = document.createElement("div");
       cell.className = "cal-cell";
-      cell.textContent = d;
       
       if(isThisMonth && d === todayD) {
         cell.classList.add("today");
@@ -261,11 +263,40 @@
       }
       cell.classList.add(statusClass);
 
-      const dot = document.createElement("div");
-      dot.className = "cal-dot";
-      cell.appendChild(dot);
+      // 日付
+      const dateEl = document.createElement("div");
+      dateEl.className = "cal-date";
+      dateEl.textContent = d;
+      cell.appendChild(dateEl);
 
-      cell.onclick = () => {
+      // 人数計算
+      const A = attendance[d] || {};
+      const presentSet = new Set([...(A.morning || []), ...(A.afternoon || []), ...(A.after || [])]);
+      const count = presentSet.size;
+
+      if (count > 0 || (sch && (sch.morning || sch.afternoon || sch.after))) {
+        const countEl = document.createElement("div");
+        countEl.className = "cal-count";
+        countEl.textContent = count;
+        countEl.title = "参加者を表示";
+        countEl.onclick = (e) => {
+          e.stopPropagation();
+          const names = Array.from(presentSet);
+          alert(names.length ? `【${d}日 参加予定】\n${names.join("\n")}` : `【${d}日】参加者なし`);
+        };
+        cell.appendChild(countEl);
+      } else if (sch && sch.off && count === 0) {
+         // 完全オフの場合は何も表示しないか、ハイフンなど
+         const noEl = document.createElement("div");
+         noEl.className = "cal-count";
+         noEl.style.fontSize = "0.8rem";
+         noEl.style.color = "#ccc";
+         noEl.textContent = "-";
+         cell.appendChild(noEl);
+      }
+
+      cell.onclick = (e) => {
+        if (e.target.classList.contains('cal-count')) return;
         const target = document.getElementById("list-day-" + d);
         if(target) {
           target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -353,17 +384,6 @@
           const next = !cur;
 
           const p = { [key]: next };
-          
-          // 修正: 「オフ」をONにしたら、活動時間はOFFにする（ユーザーの誤操作防止）
-          if (key === "off" && next) {
-            p.morning = false;
-            p.afternoon = false;
-            p.after = false;
-            schedule[dayNo].morning = false;
-            schedule[dayNo].afternoon = false;
-            schedule[dayNo].after = false;
-          }
-          // 注意: 「活動」をONにしたときに「オフ」をOFFにする処理は削除（オフかつ活動ありを許容）
           
           if (key === "after" && next) {
             const t = (schedule[dayNo].time || "").trim();

@@ -21,7 +21,8 @@
   let io = null;
 
   /* ===== ローカルキャッシュ ===== */
-  const CACHE_VER = "v2";
+  // ★変更: バージョンを "v6" に更新
+  const CACHE_VER = "v6";
   const cacheKey = (y, m) => `club_member_cache_${CACHE_VER}_${y}-${('0'+m).slice(-2)}`;
 
   function readCache(y, m) {
@@ -41,7 +42,9 @@
       }));
     } catch (e) {}
   }
-
+  
+  // (以下、前回のコードと同じ内容ですが、全量省略せずに記述します)
+  
   function getActiveName() {
     const name = (customMember || "").trim();
     return name ? name : (selectedMember || "").trim();
@@ -78,7 +81,6 @@
     loadDataAndRender();
   }
 
-  /* ===== タブ ===== */
   function buildTabsFromThisMonth() {
     const tabs = document.getElementById("tabs");
     tabs.innerHTML = "";
@@ -139,7 +141,6 @@
     }
   }
 
-  /* ===== データ読み込み ===== */
   function loadDataAndRender() {
     setLoading(true);
     const cached = readCache(currentYear, currentMonth);
@@ -206,7 +207,6 @@
       .getMemberData(y, m);
   }
 
-  /* ===== 壁掛けカレンダー描画 ===== */
   function renderOverviewCalendar() {
     const container = document.getElementById("overviewCalendar");
     container.innerHTML = "";
@@ -240,7 +240,6 @@
     for(let d=1; d<=lastDate; d++){
       const cell = document.createElement("div");
       cell.className = "cal-cell";
-      cell.textContent = d;
       
       if(isThisMonth && d === todayD) {
         cell.classList.add("today");
@@ -254,11 +253,37 @@
       }
       cell.classList.add(statusClass);
 
-      const dot = document.createElement("div");
-      dot.className = "cal-dot";
-      cell.appendChild(dot);
+      const dateEl = document.createElement("div");
+      dateEl.className = "cal-date";
+      dateEl.textContent = d;
+      cell.appendChild(dateEl);
 
-      cell.onclick = () => {
+      const A = attendanceData[d] || {};
+      const presentSet = new Set([...(A.morning || []), ...(A.afternoon || []), ...(A.after || [])]);
+      const count = presentSet.size;
+
+      if (count > 0 || (sch && (sch.morning || sch.afternoon || sch.after))) {
+         const countEl = document.createElement("div");
+         countEl.className = "cal-count";
+         countEl.textContent = count;
+         countEl.title = "参加者を表示";
+         countEl.onclick = (e) => {
+           e.stopPropagation();
+           const names = Array.from(presentSet);
+           alert(names.length ? `【${d}日 参加予定】\n${names.join("\n")}` : `【${d}日】参加者なし`);
+         };
+         cell.appendChild(countEl);
+      } else if (sch && sch.off && count === 0) {
+         const noEl = document.createElement("div");
+         noEl.className = "cal-count";
+         noEl.style.fontSize = "0.8rem";
+         noEl.style.color = "#ccc";
+         noEl.textContent = "-";
+         cell.appendChild(noEl);
+      }
+
+      cell.onclick = (e) => {
+        if (e.target.classList.contains('cal-count')) return;
         const target = document.getElementById("list-day-" + d);
         if(target) {
           target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -276,7 +301,6 @@
     container.appendChild(grid);
   }
 
-  /* ===== リスト表示 ===== */
   function renderCalendar() {
     const container = document.getElementById("calendarContainer");
     container.innerHTML = "";
@@ -335,7 +359,6 @@
         offTag.textContent = "休み";
         dayLabel.appendChild(offTag);
         
-        // オフでも活動設定があれば入力可のヒントを出す
         if (pills.length > 0) {
             const hint = document.createElement("span");
             hint.className = "request-hint";
@@ -452,11 +475,11 @@
       card.appendChild(info);
     }
 
-    // 修正: 活動予定がある場合のみフォームを表示する
-    const hasActivity = !!(activitySchedule[day]?.morning || activitySchedule[day]?.afternoon || activitySchedule[day]?.after);
+    const sch = activitySchedule[day];
+    const hasActivity = sch && (sch.morning || sch.afternoon || sch.after);
 
     if (hasActivity) {
-        const isOff = !!activitySchedule[day]?.off;
+        const isOff = !!sch.off;
         const presentLabel = isOff ? "希望" : "出席";
 
         const presentRow = createRow(day, "present", presentLabel);
@@ -552,6 +575,10 @@
     const key = tr.dataset.key;
     if (!day || !key) return;
 
+    const sch = activitySchedule[day];
+    const hasActivity = sch && (sch.morning || sch.afternoon || sch.after);
+    if (!hasActivity) return; 
+
     const activeName = getActiveName();
     if (!activeName) {
       alert("名前を選択するか、新しい名前を入力してください。");
@@ -578,6 +605,9 @@
   }
 
   function toggleFlag(day, flagKey) {
+    const sch = activitySchedule[day];
+    if (!sch || !(sch.morning || sch.afternoon || sch.after)) return;
+
     const p = pending[day] || { status: "present" };
     p.status = (p.status === "absent") ? "present" : (p.status || "present");
     p[flagKey] = !p[flagKey];

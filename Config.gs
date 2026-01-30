@@ -4,12 +4,13 @@
 const DEFAULT_ROSTER = ["ゆうり", "みゆ", "のぞみ", "えみり", "まな", "まほ", "まい", "しん"];
 const TZ = "Asia/Tokyo";
 const PROP_LOG_SHEET_ID = "LOG_SHEET_ID";
-const CACHE_PREFIX = "CLUB_DATA_V1_"; // キャッシュキーの接頭辞
-const CACHE_EXPIRATION = 21600; // キャッシュ有効時間（秒） = 6時間
+// キャッシュキーを "V5" に変更して、過去の全キャッシュ（祝日データ含む）を無効化
+const CACHE_PREFIX = "CLUB_DATA_V5_"; 
+const CACHE_EXPIRATION = 21600;
+// キャッシュ有効時間（秒） = 6時間
 
 const SCHEDULE_SHEET_CANDIDATES = ["活動予定", "スケジュール", "Schedule", "schedule"];
 const ATTENDANCE_SHEET_CANDIDATES = ["出欠", "出席", "Attendance", "attendance"];
-
 const HEADER_ALIASES = {
   // schedule
   date: ["日付", "日", "Date", "date", "DATE", "日にち"],

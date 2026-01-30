@@ -5,7 +5,10 @@
 function doGet(e) {
   var page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : "member";
   var fileName = (page === "admin") ? "admin" : "member";
-  return HtmlService.createHtmlOutputFromFile(fileName)
+  
+  // 修正: createHtmlOutputFromFile ではなく createTemplateFromFile を使い、evaluate() でスクリプトレットを実行する
+  return HtmlService.createTemplateFromFile(fileName)
+    .evaluate()
     .setTitle("女子軟式野球部")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
@@ -44,12 +47,14 @@ function openAdmin() {
 }
 
 function openMemberSidebar() {
-  var html = HtmlService.createHtmlOutputFromFile('member').setTitle('部員ページ');
+  // 修正: サイドバーも同様にテンプレート評価を行う
+  var html = HtmlService.createTemplateFromFile('member').evaluate().setTitle('部員ページ');
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
 function openAdminSidebar() {
-  var html = HtmlService.createHtmlOutputFromFile('admin').setTitle('管理者ページ');
+  // 修正: サイドバーも同様にテンプレート評価を行う
+  var html = HtmlService.createTemplateFromFile('admin').evaluate().setTitle('管理者ページ');
   SpreadsheetApp.getUi().showSidebar(html);
 }
 

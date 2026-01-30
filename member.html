@@ -1,25 +1,20 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="ja">
 <head>
   <base target="_top">
-  <title>女子軟式野球部 出欠回答（部員用）</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Rounded+Mplus+1c&display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <title>女子軟式野球部 出欠回答</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <link href="https://fonts.googleapis.com/css2?family=Rounded+Mplus+1c:wght@400;700;800&display=swap" rel="stylesheet">
   <?!= include('member_css'); ?>
 </head>
 
 <body>
-  <header>女子軟式野球部 出欠回答（部員用）</header>
-
-  <div id="chartArea" class="chart-container">
-    <canvas id="attendanceChart" style="max-height:200px;"></canvas>
-  </div>
+  <header>女子軟式野球部<br><span style="font-size:0.8em;font-weight:normal;">出欠回答</span></header>
 
   <div class="picker">
     <select id="memberSelect" aria-label="名前を選択">
-      <option value="">（既存の名前から選択）</option>
+      <option value="">（名前を選択してください）</option>
       <option value="ゆうり">ゆうり</option>
       <option value="みゆ">みゆ</option>
       <option value="のぞみ">のぞみ</option>
@@ -33,9 +28,12 @@
   </div>
 
   <div id="tabs" class="tab-container" role="tablist"></div>
-  <div id="calendarContainer" aria-live="polite"></div>
+  
+  <div id="overviewCalendar" class="overview-calendar-container"></div>
+  
+  <main id="calendarContainer" aria-live="polite"></main>
 
-  <button id="saveBtn" class="save-btn">この月の回答を送信</button>
+  <button id="saveBtn" class="save-btn">変更を送信</button>
   <div id="toast" class="toast">保存しました</div>
 
   <button id="scrollTopBtn" class="scroll-top-btn" aria-label="ページトップへ">▲</button>
@@ -49,5 +47,4 @@
 
   <?!= include('member_js'); ?>
 </body>
-
 </html>

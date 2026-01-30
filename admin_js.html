@@ -15,10 +15,10 @@
   let unsavedPatch = {};
   let adminChart = null;
 
-  /* === 時間リスト（06:00〜21:00、30分刻み）=== */
+  /* === 時間リスト === */
   const HH = halfHourList(6, 21);
 
-  /* === 管理者ページ用キャッシュ === */
+  /* === キャッシュ === */
   const ADMIN_CACHE_VER = "v2"; 
   const adminCacheKey = (y, m) => `club_admin_cache_${ADMIN_CACHE_VER}_${y}-${('0'+m).slice(-2)}`;
 
@@ -52,29 +52,17 @@
     document.getElementById("saveAllBtn").onclick = () => flushPatch();
     loadMonth();
   })();
-  /* === ローディング === */
+  
   function setLoading(on) {
     const ov = document.getElementById('loadingOverlay');
     if (!ov) return;
     ov.classList.toggle('show', !!on);
   }
 
-  /* === スケルトン表示（読み込み中の骨組み） === */
   function renderSkeletons() {
      const cont = document.getElementById("calendar");
      cont.innerHTML = "";
-     const last = new Date(currentYear, currentMonth, 0).getDate();
-     const frag = document.createDocumentFragment();
-     for(let i=0; i<last; i++) {
-       const div = document.createElement("div");
-       div.className = "skeleton-box";
-       div.innerHTML = `<div class="skeleton-line short"></div><div class="skeleton-line long"></div><div class="skeleton-line long"></div>`;
-       frag.appendChild(div);
-     }
-     cont.appendChild(frag);
-     
-     const dash = document.getElementById("dashboard");
-     dash.innerHTML = `<div class="dash-card"><div class="skeleton-line short"></div><div class="skeleton-line long"></div></div>`;
+     cont.innerHTML = '<div style="padding:2em;text-align:center;color:#999;">Loading...</div>';
   }
 
   /* === タブ === */
@@ -138,7 +126,6 @@
     }
   }
 
-  /* === 保存キュー === */
   function markDirty() {
     document.getElementById("saveAllBtn").classList.toggle("dirty", Object.keys(unsavedPatch).length > 0);
   }
@@ -157,7 +144,7 @@
     }, 2000);
   }
 
-  /* === 月データ読み込み（キャッシュ→最新差替え＋次月先読み） === */
+  /* === データ読み込み === */
   function loadMonth() {
     renderSkeletons();
     
@@ -169,8 +156,8 @@
       roster = cached.data.roster || [];
       unsavedPatch = {};
       markDirty();
+      renderOverviewCalendar();
       render(); 
-      autoScrollToToday();
     }
 
     google.script.run.withSuccessHandler(res => {
@@ -180,8 +167,8 @@
       roster = res.roster || [];
       unsavedPatch = {};
       markDirty();
+      renderOverviewCalendar();
       render(); 
-      autoScrollToToday();
       writeAdminCache(currentYear, currentMonth, {
         schedule,
         attendance,
@@ -219,7 +206,6 @@
     }).getAdminData(y, m);
   }
 
-  /* === デフォルト時間（業後ON時） === */
   function defaultAfterTimeRangeForDay(day) {
     const w = new Date(currentYear, currentMonth - 1, day).getDay();
     if (w === 1 || w === 2 || w === 5) return "16:00~18:00";
@@ -227,7 +213,77 @@
     return "";
   }
 
-  /* === UI構築 === */
+  /* === 壁掛けカレンダー描画 (月曜始まり) === */
+  function renderOverviewCalendar() {
+    const container = document.getElementById("overviewCalendar");
+    container.innerHTML = "";
+    
+    const grid = document.createElement("div");
+    grid.className = "calendar-grid";
+    
+    const weeks = ["月","火","水","木","金","土","日"];
+    weeks.forEach((w, i) => {
+      const el = document.createElement("div");
+      el.className = "cal-header";
+      if(i === 5) el.classList.add("sat");
+      if(i === 6) el.classList.add("sun");
+      el.textContent = w;
+      grid.appendChild(el);
+    });
+
+    const lastDate = new Date(currentYear, currentMonth, 0).getDate();
+    const firstDayOfWeek = new Date(currentYear, currentMonth - 1, 1).getDay();
+    const emptyCells = (firstDayOfWeek + 6) % 7;
+
+    for(let i=0; i<emptyCells; i++){
+      const empty = document.createElement("div");
+      grid.appendChild(empty);
+    }
+
+    const today = new Date();
+    const isThisMonth = (today.getFullYear() === currentYear && (today.getMonth()+1) === currentMonth);
+    const todayD = today.getDate();
+
+    for(let d=1; d<=lastDate; d++){
+      const cell = document.createElement("div");
+      cell.className = "cal-cell";
+      cell.textContent = d;
+      
+      if(isThisMonth && d === todayD) {
+        cell.classList.add("today");
+      }
+
+      const sch = schedule[d];
+      let statusClass = "status-undecided";
+      if(sch) {
+        if(sch.off) statusClass = "status-off";
+        else if(sch.morning || sch.afternoon || sch.after) statusClass = "status-active";
+      }
+      cell.classList.add(statusClass);
+
+      const dot = document.createElement("div");
+      dot.className = "cal-dot";
+      cell.appendChild(dot);
+
+      cell.onclick = () => {
+        const target = document.getElementById("list-day-" + d);
+        if(target) {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+          target.style.transition = "background-color 0.5s";
+          const originalBg = target.style.backgroundColor;
+          target.style.backgroundColor = "#fff9c4"; 
+          setTimeout(() => {
+            target.style.backgroundColor = originalBg;
+          }, 1000);
+        }
+      };
+
+      grid.appendChild(cell);
+    }
+    container.appendChild(grid);
+  }
+
+  /* === リストUI描画 === */
   function render() {
     renderDashboard();
     const cont = document.getElementById("calendar");
@@ -244,6 +300,7 @@
       const box = document.createElement("div");
       box.className = "calendar-day";
       box.dataset.day = day;
+      box.id = "list-day-" + day;
 
       if (w === 0 || holidays[day]) box.classList.add("sunday");
       else if (w === 6) box.classList.add("saturday");
@@ -296,6 +353,8 @@
           const next = !cur;
 
           const p = { [key]: next };
+          
+          // 修正: 「オフ」をONにしたら、活動時間はOFFにする（ユーザーの誤操作防止）
           if (key === "off" && next) {
             p.morning = false;
             p.afternoon = false;
@@ -303,13 +362,9 @@
             schedule[dayNo].morning = false;
             schedule[dayNo].afternoon = false;
             schedule[dayNo].after = false;
-          } else if (key !== "off" && next) {
-            p.off = false;
-            schedule[dayNo].off = false;
           }
-
-          queuePatch(String(dayNo), p);
-          schedule[dayNo][key] = next;
+          // 注意: 「活動」をONにしたときに「オフ」をOFFにする処理は削除（オフかつ活動ありを許容）
+          
           if (key === "after" && next) {
             const t = (schedule[dayNo].time || "").trim();
             if (!t) {
@@ -320,7 +375,11 @@
               }
             }
           }
+          
+          queuePatch(String(dayNo), p);
+          schedule[dayNo][key] = next;
           render();
+          renderOverviewCalendar();
         };
         return c;
       };
@@ -398,7 +457,6 @@
     cont.appendChild(frag);
   }
 
-  /* === ダッシュボード === */
   function computeAttendanceSummary() {
     const last = new Date(currentYear, currentMonth, 0).getDate();
     const activeDays = [];
@@ -494,6 +552,7 @@
         unsavedPatch = {};
         markDirty();
         render();
+        renderOverviewCalendar();
         setStatus("登録しました。");
         alert("登録しました。");
         setLoading(false);
@@ -612,24 +671,6 @@
     return row;
   }
 
-  function autoScrollToToday() {
-    const now = new Date();
-    if (currentYear === now.getFullYear() && currentMonth === (now.getMonth() + 1)) {
-      const list = document.getElementById("calendar");
-      const idx = Math.max(0, now.getDate() - 1);
-      const target = list.children[idx];
-      if (target) {
-        target.classList.add("today");
-        setTimeout(() => {
-          target.scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-          });
-        }, 300);
-      }
-    }
-  }
-
   function applyQuick(mode) {
     let targetDays = null;
     if (mode !== "UNDECIDED_OFF") {
@@ -709,6 +750,7 @@
     Object.keys(patch).forEach(d => queuePatch(String(d), patch[d]));
     markDirty();
     render();
+    renderOverviewCalendar();
     setStatus("一括変更をキューに入れました。右下の「登録」を押すと反映されます。");
   }
 

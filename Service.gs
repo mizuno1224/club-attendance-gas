@@ -20,7 +20,8 @@ function _getHolidaysMap(year, month) {
   const cached = cache.get(key);
   if (cached) return JSON.parse(cached);
   try {
-    const calId = 'ja.japanese#holiday@group.v.calendar.google.com';
+    // 修正: 公式の祝日のみを含むカレンダーIDに変更（節分などの行事を除外）
+    const calId = 'ja.japanese.official#holiday@group.v.calendar.google.com';
     const cal = CalendarApp.getCalendarById(calId);
     if (!cal) return {};
     const start = new Date(year, month - 1, 1, 0, 0, 0);
@@ -75,29 +76,60 @@ function getAttendanceForMonth(year, month, optValues) {
 
 // 共通データ取得関数（キャッシュ対応）
 function _fetchDataWithCache(year, month) {
-  const key = _getCacheKey(year, month);
+  // 静的データ（スケジュール・名簿・祝日）のキャッシュキー
+  const staticKey = "STATIC_" + year + "_" + month; 
+  // 動的データ（出席）のキャッシュキー
+  const attendanceKey = "ATTENDANCE_" + year + "_" + month;
+  
   const cache = CacheService.getScriptCache();
-  const cached = cache.get(key);
-  if (cached) {
+  
+  let scheduleData, rosterData, holidaysData, attendanceData;
+
+  // 1. 静的データの取得
+  const staticCached = cache.get(staticKey);
+  if (staticCached) {
     try {
-      return JSON.parse(cached);
+      const parsed = JSON.parse(staticCached);
+      scheduleData = parsed.schedule;
+      rosterData = parsed.roster;
+      holidaysData = parsed.holidays;
+    } catch (e) {}
+  }
+  
+  if (!scheduleData) {
+    scheduleData = getScheduleForMonth(year, month);
+    rosterData = _getRoster();
+    holidaysData = _getHolidaysMap(year, month);
+    try {
+      cache.put(staticKey, JSON.stringify({
+        schedule: scheduleData,
+        roster: rosterData,
+        holidays: holidaysData
+      }), 21600); // 6時間
     } catch (e) {}
   }
 
-  // キャッシュミス時はスプレッドシートから取得
-  const data = {
-    schedule: getScheduleForMonth(year, month),
-    attendance: getAttendanceForMonth(year, month),
-    roster: _getRoster(),
-    holidays: _getHolidaysMap(year, month)
+  // 2. 出席データの取得
+  const attCached = cache.get(attendanceKey);
+  if (attCached) {
+    try {
+      attendanceData = JSON.parse(attCached);
+    } catch (e) {}
+  }
+  
+  if (!attendanceData) {
+    attendanceData = getAttendanceForMonth(year, month);
+    try {
+      cache.put(attendanceKey, JSON.stringify(attendanceData), 21600);
+    } catch (e) {}
+  }
+
+  return {
+    schedule: scheduleData,
+    roster: rosterData,
+    holidays: holidaysData,
+    attendance: attendanceData
   };
-
-  // キャッシュに保存
-  try {
-    cache.put(key, JSON.stringify(data), CACHE_EXPIRATION);
-  } catch (e) {}
-
-  return data;
 }
 
 /* ---------- Graph Logic ---------- */
@@ -131,7 +163,8 @@ function getPersonalStats(name, startYear, startMonth, count) {
       }
     }
 
-    const rate = totalDays === 0 ? 0 : Math.round((presentCount / totalDays) * 1000) / 10;
+    const rate = totalDays === 0 ?
+      0 : Math.round((presentCount / totalDays) * 1000) / 10;
     months.push(`${m}月`);
     rates.push(rate);
 

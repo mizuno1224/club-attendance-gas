@@ -1,21 +1,21 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <base target="_top">
   <meta charset="utf-8">
   <title>女子軟式野球部 管理</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Rounded+Mplus+1c&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Rounded+Mplus+1c:wght@400;700&display=swap" rel="stylesheet">
   <?!= include('admin_css'); ?>
 </head>
-<body>
-  <header>女子軟式野球部 管理</header>
-  <div id="tabs" class="tab-container"></div>
 
+<body>
+  <header>管理画面</header>
+  <div id="tabs" class="tab-container"></div>
+  
   <div class="tools">
-    <h3 style="margin:.1em 0 .4em;font-size:1.05em;">クイック設定（この月に一括適用）</h3>
+    <h3>一括設定</h3>
     <div class="weekday" id="weekdayGroup">
       <label><input type="checkbox" value="0">日</label>
       <label><input type="checkbox" value="1">月</label>
@@ -26,32 +26,35 @@
       <label><input type="checkbox" value="6">土</label>
     </div>
     <div class="controls">
-      <button class="btn" id="qMorningOn">選んだ曜日：午前ON</button>
-      <button class="btn" id="qAfternoonOn">選んだ曜日：午後ON</button>
-      <button class="btn" id="qAfterOn">選んだ曜日：業後ON</button>
-      <button class="btn" id="qAllOff">選んだ曜日：すべてOFF</button>
-      <button class="btn" id="qClearCheck">曜日選択クリア</button>
-      <button class="btn" id="qUndecidedOff" style="margin-left:auto;background:#e2c6b0;font-weight:bold;">未定を全てオフ</button>
+      <button class="btn" id="qMorningOn">午前ON</button>
+      <button class="btn" id="qAfternoonOn">午後ON</button>
+      <button class="btn" id="qAfterOn">業後ON</button>
+      <button class="btn" id="qAllOff">全てOFF</button>
+      <button class="btn" id="qUndecidedOff" style="background:#b0a499;">未定OFF</button>
+      <button class="btn" id="qClearCheck" style="background:#fff; color:#666; border:1px solid #ccc;">選択解除</button>
     </div>
   </div>
 
   <div id="dashboard" class="dash"></div>
 
-  <div id="adminChartArea" style="display:none; margin:0 .6em 1em; padding:1em; background:#fff; border:1px solid #a67c52; border-radius:12px;">
-    <h3 style="margin:0 0 1em; font-size:1.1em;">出席率グラフ: <span id="chartTargetName"></span></h3>
-    <canvas id="adminChart" style="max-height:200px;"></canvas>
-    <button onclick="document.getElementById('adminChartArea').style.display='none'" class="btn" style="margin-top:1em;">閉じる</button>
+  <div id="adminChartArea" style="display:none; margin:1rem; padding:1rem; background:#fff; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+    <h3 style="margin-top:0;">出席率: <span id="chartTargetName"></span></h3>
+    <canvas id="adminChart" style="max-height:200px; width:100%;"></canvas>
+    <button onclick="document.getElementById('adminChartArea').style.display='none'" class="btn" style="margin-top:1rem; width:100%;">閉じる</button>
   </div>
+  
+  <div id="overviewCalendar" class="overview-calendar-container"></div>
 
   <div id="calendar" class="calendar-list"></div>
-  <button id="saveAllBtn">登録</button>
+  
+  <button id="saveAllBtn">変更を保存する</button>
   <div id="status"></div>
   <button id="scrollTopBtn" class="scroll-top-btn" aria-label="ページトップへ">▲</button>
 
   <div id="loadingOverlay" class="overlay" aria-live="polite" aria-busy="true">
     <div style="display:flex; flex-direction:column; align-items:center;">
       <div class="spinner" aria-hidden="true"></div>
-      <div class="loading-text">読み込み中…</div>
+      <div class="loading-text" style="margin-top:10px; font-weight:bold; color:#a67c52;">処理中...</div>
     </div>
   </div>
 

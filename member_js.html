@@ -1,9 +1,9 @@
 <script>
-  /* ===== 設定（現在日時から自動算出） ===== */
+  /* ===== 設定 ===== */
   const _now = new Date();
   const startYear = _now.getFullYear();
   const startMonth = _now.getMonth() + 1;
-  const monthsCount = 4; // 今月含めて4ヶ月分（3ヶ月先まで）
+  const monthsCount = 4;
 
   /* ===== 状態 ===== */
   let currentYear = startYear,
@@ -11,16 +11,14 @@
   let activitySchedule = {},
     attendanceData = {},
     holidays = {};
-  let roster = []; // 部員数計算用
+  let roster = [];
 
-  let myChart = null; // Chart instance
   let selectedMember = "",
     customMember = "";
-  // day -> { status: "present" | "absent" | "clear", tardy?:boolean, early?:boolean }
   const pending = {};
   let isSaving = false;
-  const dom = {}; // dom[day] = {present:{cb,count,names}, absent:{cb,count,names}}
-  let io = null; // IntersectionObserver
+  const dom = {};
+  let io = null;
 
   /* ===== ローカルキャッシュ ===== */
   const CACHE_VER = "v2";
@@ -68,24 +66,19 @@
       selectedMember = document.getElementById("memberSelect").value;
       localStorage.setItem("club_member_name_sel", selectedMember || "");
       refreshChecksForAllDays();
-      updateGraph();
     });
     document.getElementById("memberInput").addEventListener("input", () => {
       customMember = document.getElementById("memberInput").value;
       localStorage.setItem("club_member_name_custom", customMember || "");
       refreshChecksForAllDays();
-      updateGraph();
     });
     document.getElementById("saveBtn").addEventListener("click", () => flushPending(true));
 
-    // 初期ロード時にもグラフ更新
-    if (getActiveName()) updateGraph();
     document.getElementById("calendarContainer").addEventListener("click", onCalendarClick);
-
     loadDataAndRender();
   }
 
-  /* ===== タブ生成（当月以降のみ） ===== */
+  /* ===== タブ ===== */
   function buildTabsFromThisMonth() {
     const tabs = document.getElementById("tabs");
     tabs.innerHTML = "";
@@ -146,7 +139,7 @@
     }
   }
 
-  /* ===== データ読み込み（キャッシュ即描画 → 裏で最新取得） ===== */
+  /* ===== データ読み込み ===== */
   function loadDataAndRender() {
     setLoading(true);
     const cached = readCache(currentYear, currentMonth);
@@ -159,6 +152,7 @@
       activitySchedule = sch || {};
       attendanceData = att || {};
       holidays = hol || {};
+      renderOverviewCalendar();
       renderCalendar();
       updateSaveButton();
     }
@@ -167,13 +161,14 @@
         activitySchedule = res.schedule || {};
         attendanceData = res.attendance || {};
         holidays = res.holidays || {};
-        roster = res.roster || []; // ロースター取得
+        roster = res.roster || [];
         writeCache(currentYear, currentMonth, {
           schedule: activitySchedule,
           attendance: attendanceData,
           holidays,
           roster
         });
+        renderOverviewCalendar();
         renderCalendar();
         updateSaveButton();
         prefetchNextMonth();
@@ -211,25 +206,77 @@
       .getMemberData(y, m);
   }
 
-  /* ===== ユーティリティ ===== */
-  function showToast(msg = "保存しました") {
-    const t = document.getElementById("toast");
-    t.textContent = msg;
-    t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 1000);
+  /* ===== 壁掛けカレンダー描画 ===== */
+  function renderOverviewCalendar() {
+    const container = document.getElementById("overviewCalendar");
+    container.innerHTML = "";
+    
+    const grid = document.createElement("div");
+    grid.className = "calendar-grid";
+    
+    const weeks = ["月","火","水","木","金","土","日"];
+    weeks.forEach((w, i) => {
+      const el = document.createElement("div");
+      el.className = "cal-header";
+      if(i === 5) el.classList.add("sat");
+      if(i === 6) el.classList.add("sun");
+      el.textContent = w;
+      grid.appendChild(el);
+    });
+
+    const lastDate = new Date(currentYear, currentMonth, 0).getDate();
+    const firstDayOfWeek = new Date(currentYear, currentMonth - 1, 1).getDay();
+    const emptyCells = (firstDayOfWeek + 6) % 7;
+
+    for(let i=0; i<emptyCells; i++){
+      const empty = document.createElement("div");
+      grid.appendChild(empty);
+    }
+
+    const today = new Date();
+    const isThisMonth = (today.getFullYear() === currentYear && (today.getMonth()+1) === currentMonth);
+    const todayD = today.getDate();
+
+    for(let d=1; d<=lastDate; d++){
+      const cell = document.createElement("div");
+      cell.className = "cal-cell";
+      cell.textContent = d;
+      
+      if(isThisMonth && d === todayD) {
+        cell.classList.add("today");
+      }
+
+      const sch = activitySchedule[d];
+      let statusClass = "status-undecided";
+      if(sch) {
+        if(sch.off) statusClass = "status-off";
+        else if(sch.morning || sch.afternoon || sch.after) statusClass = "status-active";
+      }
+      cell.classList.add(statusClass);
+
+      const dot = document.createElement("div");
+      dot.className = "cal-dot";
+      cell.appendChild(dot);
+
+      cell.onclick = () => {
+        const target = document.getElementById("list-day-" + d);
+        if(target) {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+          target.style.transition = "background-color 0.5s";
+          const originalBg = target.style.backgroundColor;
+          target.style.backgroundColor = "#fff9c4"; 
+          setTimeout(() => {
+            target.style.backgroundColor = originalBg;
+          }, 1000);
+        }
+      };
+
+      grid.appendChild(cell);
+    }
+    container.appendChild(grid);
   }
 
-  function updateSaveButton() {
-    const btn = document.getElementById("saveBtn");
-    if (Object.keys(pending).length > 0) btn.classList.add("dirty");
-    else btn.classList.remove("dirty");
-  }
-
-  function queueChange(day, obj) {
-    pending[day] = obj;
-    updateSaveButton();
-  }
-
+  /* ===== リスト表示 ===== */
   function renderCalendar() {
     const container = document.getElementById("calendarContainer");
     container.innerHTML = "";
@@ -243,21 +290,22 @@
     const list = document.createElement("div");
     list.className = "calendar-list";
     const frag = document.createDocumentFragment();
-    // Today check
+    
     const now = new Date();
     const isCurrentMonth = (currentYear === now.getFullYear() && currentMonth === (now.getMonth() + 1));
     const todayDate = now.getDate();
-    let todayEl = null;
+
     for (let day = 1; day <= lastDate; day++) {
       const date = new Date(currentYear, currentMonth - 1, day),
         w = date.getDay();
       const card = document.createElement("div");
       card.className = "calendar-day-box";
       card.dataset.day = String(day);
+      card.id = "list-day-" + day;
       card.dataset.hydrated = "0";
+
       if (isCurrentMonth && day === todayDate) {
         card.classList.add("today");
-        todayEl = card;
       }
 
       if (w === 0 || holidays[day]) card.classList.add("sunday");
@@ -280,7 +328,6 @@
       }
       card.appendChild(dayLabel);
       
-      // オフの日対応
       if (activitySchedule[day]?.off) {
         card.classList.add("off");
         const offTag = document.createElement("span");
@@ -288,10 +335,13 @@
         offTag.textContent = "休み";
         dayLabel.appendChild(offTag);
         
-        const hint = document.createElement("span");
-        hint.className = "request-hint";
-        hint.textContent = "※活動希望があれば下の「希望」をチェック";
-        dayLabel.appendChild(hint);
+        // オフでも活動設定があれば入力可のヒントを出す
+        if (pills.length > 0) {
+            const hint = document.createElement("span");
+            hint.className = "request-hint";
+            hint.textContent = "※活動希望があれば下の「希望」をチェック";
+            dayLabel.appendChild(hint);
+        }
 
         if (activitySchedule[day]?.note) {
           const note = document.createElement("div");
@@ -317,7 +367,6 @@
         }
       }
 
-      // スケルトン（読み込み待ち表示）
       const sk2 = document.createElement("div");
       sk2.className = "skeleton";
       sk2.style.height = "2.4em";
@@ -359,20 +408,10 @@
         hydrateDayCard(el, parseInt(el.dataset.day, 10));
       }
     }));
-    // Scroll to today
-    if (todayEl) {
-      setTimeout(() => {
-        todayEl.scrollIntoView({
-          behavior: "smooth",
-          block: "center"
-        });
-      }, 300);
-    }
   }
 
   function hydrateDayCard(card, day) {
     card.dataset.hydrated = "1";
-    // ラベル等を保持して中身を再構築
     const children = Array.from(card.children);
     const dayLabel = children.find(c => c.classList.contains("day-label"));
     const eventNote = children.find(c => c.classList.contains("event-note"));
@@ -413,31 +452,37 @@
       card.appendChild(info);
     }
 
-    const isOff = !!activitySchedule[day]?.off;
-    const presentLabel = isOff ? "希望" : "出席";
+    // 修正: 活動予定がある場合のみフォームを表示する
+    const hasActivity = !!(activitySchedule[day]?.morning || activitySchedule[day]?.afternoon || activitySchedule[day]?.after);
 
-    const presentRow = createRow(day, "present", presentLabel);
-    const absentRow = createRow(day, "absent", "欠席");
-    
-    card.appendChild(presentRow.row);
-    if (!isOff) {
-      card.appendChild(absentRow.row);
+    if (hasActivity) {
+        const isOff = !!activitySchedule[day]?.off;
+        const presentLabel = isOff ? "希望" : "出席";
+
+        const presentRow = createRow(day, "present", presentLabel);
+        card.appendChild(presentRow.row);
+        
+        let absentRow = null;
+        if (!isOff) {
+            absentRow = createRow(day, "absent", "欠席");
+            card.appendChild(absentRow.row);
+        }
+
+        dom[day] = {
+            present: {
+                cb: presentRow.cb,
+                count: presentRow.count,
+                names: presentRow.names
+            },
+            absent: absentRow ? {
+                cb: absentRow.cb,
+                count: absentRow.count,
+                names: absentRow.names
+            } : null
+        };
+        updateCountsAndNames(day);
+        updateChecks(day);
     }
-
-    dom[day] = {
-      present: {
-        cb: presentRow.cb,
-        count: presentRow.count,
-        names: presentRow.names
-      },
-      absent: {
-        cb: absentRow.cb,
-        count: absentRow.count,
-        names: absentRow.names
-      }
-    };
-    updateCountsAndNames(day);
-    updateChecks(day);
   }
 
   function createRow(day, key, labelText) {
@@ -683,7 +728,22 @@
     if (!d) return;
 
     d.present.count.textContent = present.length;
-    if (d.absent) d.absent.count.textContent = absent.length;
+    d.present.count.onclick = (e) => {
+      e.stopPropagation();
+      const decorated = present.map(n => {
+        const marks = [(tardySet.has(n) ? "遅" : ""), (earlySet.has(n) ? "早" : "")].join("");
+        return marks ? `${n}（${marks}）` : n;
+      });
+      alert(`【出席 ${present.length}名】\n` + (decorated.length ? decorated.join("\n") : "なし"));
+    };
+
+    if (d.absent) {
+      d.absent.count.textContent = absent.length;
+      d.absent.count.onclick = (e) => {
+        e.stopPropagation();
+        alert(`【欠席 ${absent.length}名】\n` + (absent.length ? absent.join("\n") : "なし"));
+      };
+    }
     
     const decorated = present.map(n => {
       const marks = [(tardySet.has(n) ? "遅" : ""), (earlySet.has(n) ? "早" : "")].join("");
@@ -737,44 +797,22 @@
     }
   }
 
-  function updateGraph() {
-    const name = getActiveName();
-    const area = document.getElementById("chartArea");
-    if (!name) {
-      area.classList.remove("active");
-      return;
-    }
+  function showToast(msg = "保存しました") {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 1000);
+  }
 
-    area.classList.add("active");
-    google.script.run.withSuccessHandler(res => {
-      const ctx = document.getElementById('attendanceChart').getContext('2d');
-      if (myChart) {
-        myChart.destroy();
-      }
+  function updateSaveButton() {
+    const btn = document.getElementById("saveBtn");
+    if (Object.keys(pending).length > 0) btn.classList.add("dirty");
+    else btn.classList.remove("dirty");
+  }
 
-      myChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: res.months,
-          datasets: [{
-            label: name + 'の出席率(%)',
-            data: res.rates,
-            backgroundColor: '#a67c52',
-            borderRadius: 4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              max: 100
-            }
-          }
-        }
-      });
-    }).getStatsForGraph(name, startYear, startMonth, monthsCount);
+  function queueChange(day, obj) {
+    pending[day] = obj;
+    updateSaveButton();
   }
 
   const scrollBtn = document.getElementById("scrollTopBtn");

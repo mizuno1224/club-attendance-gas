@@ -1,0 +1,15 @@
+# Git
+.git
+.gitignore
+
+# Docs / memo (GASに不要)
+**/README*
+**/memo.txt
+**/*.md
+
+# Dependencies
+node_modules
+
+# IDE
+.idea
+.vscode

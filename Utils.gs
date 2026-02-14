@@ -37,17 +37,6 @@ function _uniq(arr) {
   return Array.from(new Set(arr));
 }
 
-/* ---------- Cache Helpers ---------- */
-function _getCacheKey(year, month) {
-  return CACHE_PREFIX + year + "_" + month;
-}
-
-function _clearCache(year, month) {
-  try {
-    CacheService.getScriptCache().remove(_getCacheKey(year, month));
-  } catch (e) {}
-}
-
 /* ---------- Generic Sheet Helpers ---------- */
 function _detectHeaderMap(row, mapKeys) {
   const find = (aliases) => {

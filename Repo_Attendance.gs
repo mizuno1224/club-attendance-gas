@@ -116,7 +116,7 @@ function _readAttendanceDay(year, month, day) {
   };
 }
 
-// 1日分だけ書き込み（Upsert）
+// 1日分だけ書き込み（Upsert）— 1回の setValues でまとめて書き込み
 function _writeAttendanceDay(year, month, day, presentList, absentList, tardyList, earlyList) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = _getAttendanceSheet();
@@ -125,6 +125,11 @@ function _writeAttendanceDay(year, month, day, presentList, absentList, tardyLis
   const vals = sh.getDataRange().getValues();
   const map = _detectAttendanceHeader(vals[0]);
   const dateObj = new Date(year, month - 1, day);
+  const presentStr = _uniq(presentList || []).join(",");
+  const absentStr = _uniq(absentList || []).join(",");
+  const tardyStr = _uniq(tardyList || []).join(",");
+  const earlyStr = _uniq(earlyList || []).join(",");
+
   let rowIdx = -1;
   for (let r = 1; r < vals.length; r++) {
     const v = vals[r][map.date];
@@ -137,27 +142,82 @@ function _writeAttendanceDay(year, month, day, presentList, absentList, tardyLis
     }
   }
   if (rowIdx < 0) {
-    rowIdx = sh.getLastRow() + 1;
+    rowIdx = vals.length + 1;
+    const newRow = new Array(vals[0].length).fill("");
+    newRow[map.date] = dateObj;
+    if (map.present >= 0) newRow[map.present] = presentStr;
+    if (map.absent >= 0) newRow[map.absent] = absentStr;
+    if (map.tardy >= 0) newRow[map.tardy] = tardyStr;
+    if (map.early >= 0) newRow[map.early] = earlyStr;
+    vals.push(newRow);
+    sh.getRange(vals.length, 1, vals.length, newRow.length).setValues([newRow]);
+    sh.getRange(vals.length, map.date + 1).setNumberFormat("yyyy/MM/dd");
+    return;
   }
-  sh.getRange(rowIdx, map.date + 1).setValue(dateObj);
-  if (map.present >= 0) sh.getRange(rowIdx, map.present + 1).setValue(_uniq(presentList || []).join(","));
-  if (map.absent >= 0) sh.getRange(rowIdx, map.absent + 1).setValue(_uniq(absentList || []).join(","));
-  if (map.tardy >= 0) sh.getRange(rowIdx, map.tardy + 1).setValue(_uniq(tardyList || []).join(","));
-  if (map.early >= 0) sh.getRange(rowIdx, map.early + 1).setValue(_uniq(earlyList || []).join(","));
+
+  const r = rowIdx - 1;
+  const row = vals[r].slice();
+  row[map.date] = dateObj;
+  if (map.present >= 0) row[map.present] = presentStr;
+  if (map.absent >= 0) row[map.absent] = absentStr;
+  if (map.tardy >= 0) row[map.tardy] = tardyStr;
+  if (map.early >= 0) row[map.early] = earlyStr;
+  sh.getRange(rowIdx, 1, rowIdx, row.length).setValues([row]);
   sh.getRange(rowIdx, map.date + 1).setNumberFormat("yyyy/MM/dd");
 }
 
-// 月全体を書き戻す（saveMemberResponse 用）
+// 月全体を書き戻す（saveMemberResponse 用）— 一括読み書きで高速化
 function _writeAttendanceToSheet(year, month, attendanceMap) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = _getAttendanceSheet();
+  if (!sh) sh = ss.insertSheet(ATTENDANCE_SHEET_CANDIDATES[0]);
+  _ensureAttendanceHeader(sh);
+
+  const range = sh.getDataRange();
+  const vals = range.getValues();
+  const map = _detectAttendanceHeader(vals[0]);
+  if (map.date < 0) return;
+
+  const dateToRowIdx = {};
+  for (let r = 1; r < vals.length; r++) {
+    const v = vals[r][map.date];
+    if (!v) continue;
+    const d = v instanceof Date ? v : new Date(v);
+    if (isNaN(d)) continue;
+    if (d.getFullYear() === year && (d.getMonth() + 1) === month) {
+      dateToRowIdx[d.getDate()] = r;
+    }
+  }
+
   const days = Object.keys(attendanceMap || {});
   days.forEach(k => {
-    const d = parseInt(k, 10);
-    if (isNaN(d)) return;
+    const day = parseInt(k, 10);
+    if (isNaN(day)) return;
     const A = attendanceMap[k] || {};
     const present = _uniq([...(A.morning || []), ...(A.afternoon || []), ...(A.after || [])]);
     const absent = _uniq(A.absent || []);
     const tardy = _uniq(A.tardy || []);
     const early = _uniq(A.early || []);
-    _writeAttendanceDay(year, month, d, present, absent, tardy, early);
+
+    let r = dateToRowIdx[day];
+    if (r === undefined) {
+      const newRow = new Array(vals[0].length).fill("");
+      newRow[map.date] = new Date(year, month - 1, day);
+      vals.push(newRow);
+      r = vals.length - 1;
+      dateToRowIdx[day] = r;
+    }
+
+    if (map.present >= 0) vals[r][map.present] = present.join(",");
+    if (map.absent >= 0) vals[r][map.absent] = absent.join(",");
+    if (map.tardy >= 0) vals[r][map.tardy] = tardy.join(",");
+    if (map.early >= 0) vals[r][map.early] = early.join(",");
   });
+
+  if (vals.length > 0) {
+    sh.getRange(1, 1, vals.length, vals[0].length).setValues(vals);
+    if (vals.length > 1) {
+      sh.getRange(2, map.date + 1, vals.length, map.date + 1).setNumberFormat("yyyy/MM/dd");
+    }
+  }
 }

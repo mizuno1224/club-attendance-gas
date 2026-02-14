@@ -36,7 +36,7 @@ function _getHolidaysMap(year, month) {
         map[d.getDate()] = e.getTitle();
       }
     });
-    cache.put(key, JSON.stringify(map), 21600);
+    cache.put(key, JSON.stringify(map), CACHE_EXPIRATION);
     return map;
   } catch (err) {
     return {};
@@ -75,26 +75,22 @@ function getAttendanceForMonth(year, month, optValues) {
   return _readAttendanceFromSheet(year, month, optValues);
 }
 
-// 共通データ取得関数（キャッシュ対応）
+// 共通データ取得関数（キャッシュ対応）— getAll で1回のキャッシュアクセスにまとめる
 function _fetchDataWithCache(year, month) {
-  // ★変更: キャッシュキーに "V6" を含める（これで確実に古いデータを無視します）
   const staticKey = "STATIC_V6_" + year + "_" + month;
   const attendanceKey = "ATTENDANCE_V6_" + year + "_" + month;
-  
   const cache = CacheService.getScriptCache();
+  const cached = cache.getAll([staticKey, attendanceKey]);
   let scheduleData, rosterData, holidaysData, attendanceData;
 
-  // 1. 静的データの取得
-  const staticCached = cache.get(staticKey);
-  if (staticCached) {
+  if (cached[staticKey]) {
     try {
-      const parsed = JSON.parse(staticCached);
+      const parsed = JSON.parse(cached[staticKey]);
       scheduleData = parsed.schedule;
       rosterData = parsed.roster;
       holidaysData = parsed.holidays;
     } catch (e) {}
   }
-  
   if (!scheduleData) {
     scheduleData = getScheduleForMonth(year, month);
     rosterData = _getRoster();
@@ -104,22 +100,19 @@ function _fetchDataWithCache(year, month) {
         schedule: scheduleData,
         roster: rosterData,
         holidays: holidaysData
-      }), 21600);
+      }), CACHE_EXPIRATION);
     } catch (e) {}
   }
 
-  // 2. 出席データの取得
-  const attCached = cache.get(attendanceKey);
-  if (attCached) {
+  if (cached[attendanceKey]) {
     try {
-      attendanceData = JSON.parse(attCached);
+      attendanceData = JSON.parse(cached[attendanceKey]);
     } catch (e) {}
   }
-  
   if (!attendanceData) {
     attendanceData = getAttendanceForMonth(year, month);
     try {
-      cache.put(attendanceKey, JSON.stringify(attendanceData), 21600);
+      cache.put(attendanceKey, JSON.stringify(attendanceData), CACHE_EXPIRATION);
     } catch (e) {}
   }
 
@@ -172,14 +165,12 @@ function getPersonalStats(name, startYear, startMonth, count) {
   return { months, rates };
 }
 
-/* ---------- Utils for Cache Clearing ---------- */
-// ※ Controller.gsで呼ばれているがコードに見当たらないため、念のためここに追加・確認してください
+/* ---------- Cache Clearing ---------- */
 function _clearCache(year, month) {
   const cache = CacheService.getScriptCache();
-  // Service.gs内のキーと一致させる必要があります
   cache.remove("STATIC_V6_" + year + "_" + month);
   cache.remove("ATTENDANCE_V6_" + year + "_" + month);
-  // 念のため古い形式も削除
   cache.remove("STATIC_" + year + "_" + month);
   cache.remove("ATTENDANCE_" + year + "_" + month);
+  cache.remove(CACHE_PREFIX + year + "_" + month);
 }

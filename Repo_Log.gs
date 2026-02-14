@@ -35,7 +35,8 @@ function _appendLogBatch(logRows) {
       r[0] || "admin", r[1], r[2], r[3], r[4], String(r[5] ?? ""), String(r[6] ?? "")
     ]);
     if (rows.length > 0) {
-      sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+      const startRow = sh.getLastRow() + 1;
+      sh.getRange(startRow, 1, startRow + rows.length - 1, rows[0].length).setValues(rows);
     }
   } catch (e) {}
 }
